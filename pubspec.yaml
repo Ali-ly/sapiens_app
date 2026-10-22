@@ -1,4 +1,4 @@
-name: cattle_app
+name: sapita_app
 description: "SAPITA: pantau bobot sapi dan rencanakan kebutuhan pakan."
 publish_to: 'none'
 

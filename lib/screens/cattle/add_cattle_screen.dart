@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../models/cattle_draft.dart';
-import '../../state/farm_store.dart';
+
+import '../../models/cattle.dart';
+import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../../widgets/unsaved_changes_guard.dart';
 import 'cattle_profile_screen.dart';
 
 class AddCattleScreen extends StatefulWidget {
   const AddCattleScreen({super.key, this.cattle});
-  final CattleDraft? cattle;
+  final Cattle? cattle;
   @override
   State<AddCattleScreen> createState() => _AddCattleScreenState();
 }
@@ -37,67 +38,92 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
   }
 
   Future<void> save() async {
-    if (!form.currentState!.validate()) return;
+    if (!form.currentState!.validate()) {
+      return;
+    }
     setState(() => busy = true);
     try {
       final old = widget.cattle;
       final kg = double.tryParse(weight.text.replaceAll(',', '.'));
       final saved = old != null
-          ? await FarmStore.instance.updateIdentity(old.id,
+          ? await FarmScope.read(context).updateIdentity(
+              old.id,
               name: name.text,
               gender: gender,
               ageMonths: int.parse(age.text.trim()),
-              notes: notes.text)
-          : await FarmStore.instance.save(CattleDraft(
-              nameOrId: name.text.trim(),
-              gender: gender,
-              ageMonths: int.parse(age.text.trim()),
-              notes: notes.text.trim(),
-              estimatedWeight: kg,
-              history: kg == null
-                  ? []
-                  : [
-                      WeightRecord(
-                          weightKg: kg, date: DateTime.now(), source: 'manual')
-                    ]));
-      if (!mounted) return;
+              notes: notes.text,
+            )
+          : await FarmScope.read(context).saveCattle(
+              Cattle(
+                nameOrId: name.text.trim(),
+                gender: gender,
+                ageMonths: int.parse(age.text.trim()),
+                notes: notes.text.trim(),
+                estimatedWeight: kg,
+                history: kg == null
+                    ? []
+                    : [
+                        WeightRecord(
+                          weightKg: kg,
+                          date: DateTime.now(),
+                          source: 'manual',
+                        )
+                      ],
+              ),
+            );
+      if (!mounted) {
+        return;
+      }
       dirty = false;
       final messenger = ScaffoldMessenger.of(context);
       if (old == null) {
         Navigator.pushReplacement<void, void>(
-            context,
-            MaterialPageRoute(
-                builder: (_) => CattleProfileScreen(cattle: saved)));
+          context,
+          MaterialPageRoute(
+            builder: (_) => CattleProfileScreen(cattle: saved),
+          ),
+        );
       } else {
         Navigator.pop(context);
       }
-      messenger.showSnackBar(SnackBar(
-          content: Text(old == null
-              ? 'Sapi ditambahkan. Catat bobot lalu hitung pakannya.'
-              : 'Identitas sapi diperbarui.')));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            old == null
+                ? 'Sapi ditambahkan. Catat bobot lalu hitung pakannya.'
+                : 'Identitas sapi diperbarui.',
+          ),
+        ),
+      );
     } catch (e) {
-      if (mounted) showError(context, e);
+      if (mounted) {
+        showError(context, e);
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() => busy = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) => UnsavedChangesGuard(
-      dirty: dirty,
-      busy: busy,
-      child: FarmPage(
-        title: widget.cattle == null ? 'Tambah sapi' : 'Edit profil sapi',
-        subtitle: 'Identitas yang rapi, pemantauan lebih mudah.',
-        back: true,
-        children: [
-          Panel(
-            child: AbsorbPointer(
+        dirty: dirty,
+        busy: busy,
+        child: FarmPage(
+          title: widget.cattle == null ? 'Tambah sapi' : 'Edit profil sapi',
+          subtitle: 'Identitas yang rapi, pemantauan lebih mudah.',
+          back: true,
+          children: [
+            Panel(
+              child: AbsorbPointer(
                 absorbing: busy,
                 child: Form(
                   key: form,
                   onChanged: () {
-                    if (!dirty) setState(() => dirty = true);
+                    if (!dirty) {
+                      setState(() => dirty = true);
+                    }
                   },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,10 +184,12 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                         selected: {gender},
                         onSelectionChanged: busy
                             ? null
-                            : (s) => setState(() {
-                                  gender = s.first;
-                                  dirty = true;
-                                }),
+                            : (s) => setState(
+                                  () {
+                                    gender = s.first;
+                                    dirty = true;
+                                  },
+                                ),
                       ),
                       const SizedBox(height: 20),
                       if (widget.cattle == null) ...[
@@ -176,7 +204,9 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                             prefixIcon: Icon(Icons.monitor_weight_outlined),
                           ),
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return null;
+                            if (v == null || v.trim().isEmpty) {
+                              return null;
+                            }
                             final w = double.tryParse(v.replaceAll(',', '.'));
                             return w == null || !w.isFinite || w < 1 || w > 2000
                                 ? 'Masukkan bobot 1–2.000 kg.'
@@ -209,13 +239,15 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                       ),
                     ],
                   ),
-                )),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Setelah disimpan, kamu langsung masuk ke profil sapi untuk mencatat bobot dan menghitung kebutuhan pakan.',
-            style: TextStyle(fontSize: 13, height: 1.5),
-          ),
-        ],
-      ));
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Setelah disimpan, kamu langsung masuk ke profil sapi untuk mencatat bobot dan menghitung kebutuhan pakan.',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+          ],
+        ),
+      );
 }

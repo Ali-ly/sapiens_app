@@ -1,38 +1,25 @@
 import 'selected_image.dart';
+import 'weight_record.dart';
 
-class WeightRecord {
-  const WeightRecord(
-      {required this.weightKg, required this.date, this.source = 'unknown'});
+export 'weight_record.dart';
 
-  final double weightKg;
-  final DateTime date;
-  final String source;
-  String get sourceLabel =>
-      {
-        'ai': 'Estimasi foto AI',
-        'manual': 'Timbangan manual',
-        'demo': 'Data contoh',
-        'unknown': 'Catatan bobot'
-      }[source] ??
-      'Catatan bobot';
-}
-
-class CattleDraft {
-  const CattleDraft({
+class Cattle {
+  Cattle({
     required this.nameOrId,
     this.id = '',
     required this.gender,
     required this.ageMonths,
     this.notes = '',
-    this.images = const [],
-    this.latestCheckImages = const [],
+    List<SelectedImage> images = const [],
+    List<SelectedImage> latestCheckImages = const [],
     this.estimatedWeight,
     this.predictionSpread,
     this.validImages = 0,
     this.rejectedImages = 0,
-    this.history = const [],
-    this.placeholderEmoji = '🐄',
-  });
+    List<WeightRecord> history = const [],
+  })  : images = List.unmodifiable(images),
+        latestCheckImages = List.unmodifiable(latestCheckImages),
+        history = List.unmodifiable(history);
 
   final String id;
   final String nameOrId;
@@ -51,9 +38,7 @@ class CattleDraft {
 
   final List<WeightRecord> history;
 
-  final String placeholderEmoji;
-
-  CattleDraft copyWith({
+  Cattle copyWith({
     String? id,
     String? nameOrId,
     String? gender,
@@ -67,9 +52,8 @@ class CattleDraft {
     int? validImages,
     int? rejectedImages,
     List<WeightRecord>? history,
-    String? placeholderEmoji,
   }) {
-    return CattleDraft(
+    return Cattle(
       id: id ?? this.id,
       nameOrId: nameOrId ?? this.nameOrId,
       gender: gender ?? this.gender,
@@ -83,7 +67,6 @@ class CattleDraft {
       validImages: validImages ?? this.validImages,
       rejectedImages: rejectedImages ?? this.rejectedImages,
       history: history ?? this.history,
-      placeholderEmoji: placeholderEmoji ?? this.placeholderEmoji,
     );
   }
 }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../core/constants/app_colors.dart';
-import '../state/farm_store.dart';
+import '../state/farm_scope.dart';
 import '../widgets/bottom_nav_bar.dart';
-import 'home/home_screen.dart';
 import 'cattle/cattle_list_screen.dart';
 import 'feed/feed_hub_screen.dart';
+import 'home/home_screen.dart';
 import 'profile/user_profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -19,7 +20,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (!FarmStore.instance.ready) FarmStore.instance.load();
   }
 
   @override
@@ -30,31 +30,42 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) setState(() {});
+    if (state == AppLifecycleState.resumed) {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-      animation: FarmStore.instance,
-      builder: (context, _) => Scaffold(
+        animation: FarmScope.read(context),
+        builder: (context, _) => Scaffold(
           backgroundColor: AppColors.backgroundTop,
           body: Center(
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 660),
-                  child: !FarmStore.instance.ready
-                      ? const Center(child: CircularProgressIndicator())
-                      : Scaffold(
-                          backgroundColor: AppColors.background,
-                          body: IndexedStack(index: index, children: [
-                            HomeScreen(
-                                onSeeAll: () => setState(() => index = 1),
-                                onFeed: () => setState(() => index = 2)),
-                            const CattleListScreen(),
-                            const FeedHubScreen(),
-                            const UserProfileScreen()
-                          ]),
-                          bottomNavigationBar: BottomNavBar(
-                              selectedIndex: index,
-                              onSelected: (v) =>
-                                  setState(() => index = v)))))));
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 660),
+              child: !FarmScope.read(context).ready
+                  ? const Center(child: CircularProgressIndicator())
+                  : Scaffold(
+                      backgroundColor: AppColors.background,
+                      body: IndexedStack(
+                        index: index,
+                        children: [
+                          HomeScreen(
+                            onSeeAll: () => setState(() => index = 1),
+                            onFeed: () => setState(() => index = 2),
+                          ),
+                          const CattleListScreen(),
+                          const FeedHubScreen(),
+                          const UserProfileScreen()
+                        ],
+                      ),
+                      bottomNavigationBar: BottomNavBar(
+                        selectedIndex: index,
+                        onSelected: (v) => setState(() => index = v),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      );
 }

@@ -1,32 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/main_screen.dart';
+import 'state/farm_scope.dart';
+import 'state/farm_store.dart';
 
-class SapitaApp extends StatelessWidget {
-  const SapitaApp({super.key});
+class SapitaApp extends StatefulWidget {
+  const SapitaApp({super.key, this.store});
+  final FarmStore? store;
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: AppStrings.appTitle,
-        theme: AppTheme.light,
-        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-          value: SystemUiOverlayStyle.dark.copyWith(
+  State<SapitaApp> createState() => _SapitaAppState();
+}
+
+class _SapitaAppState extends State<SapitaApp> {
+  late final FarmStore _store;
+  late final bool _ownsStore;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsStore = widget.store == null;
+    _store = widget.store ?? FarmStore();
+    if (!_store.ready) {
+      _store.load();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_ownsStore) {
+      _store.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FarmScope(
+        store: _store,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: AppStrings.appTitle,
+          theme: AppTheme.light,
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark.copyWith(
               statusBarColor: Colors.transparent,
               systemNavigationBarColor: AppColors.background,
               systemNavigationBarIconBrightness: Brightness.dark,
-              statusBarBrightness: Brightness.light),
-          child: child ?? const SizedBox.shrink(),
+              statusBarBrightness: Brightness.light,
+            ),
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: const MainScreen(),
         ),
-        home: const MainScreen(),
       );
-}
-
-// Compatibility for existing integrations and older tests.
-@Deprecated('Gunakan SapitaApp')
-class CattleApp extends SapitaApp {
-  const CattleApp({super.key});
 }

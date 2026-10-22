@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
 import '../../core/constants/app_colors.dart';
-import '../../state/farm_store.dart';
+import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import 'add_cattle_screen.dart';
+import 'cattle_profile_screen.dart';
 
 class CattleListScreen extends StatefulWidget {
   const CattleListScreen({
@@ -36,9 +38,9 @@ class _CattleListScreenState extends State<CattleListScreen> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: FarmStore.instance,
+        animation: FarmScope.read(context),
         builder: (context, _) {
-          final store = FarmStore.instance;
+          final store = FarmScope.read(context);
           final list = store.cattle
               .where(
                 (c) =>
@@ -101,9 +103,14 @@ class _CattleListScreenState extends State<CattleListScreen> {
               Row(
                 children: [
                   Expanded(
-                      child: Text('${list.length} sapi ditemukan',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary))),
+                    child: Text(
+                      '${list.length} sapi ditemukan',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
                   DropdownButton<String>(
                     value: sort,
                     underline: const SizedBox(),
@@ -140,15 +147,28 @@ class _CattleListScreenState extends State<CattleListScreen> {
                           child: const Text('Tambah sapi'),
                         )
                       : TextButton(
-                          onPressed: () => setState(() {
-                            filter = 'Semua';
-                            query = '';
-                            search.clear();
-                          }),
+                          onPressed: () => setState(
+                            () {
+                              filter = 'Semua';
+                              query = '';
+                              search.clear();
+                            },
+                          ),
                           child: const Text('Reset filter'),
                         ),
                 ),
-              ...list.map((c) => CattleTile(cattle: c)),
+              ...list.map(
+                (c) => CattleTile(
+                  cattle: c,
+                  feedReady: store.planReady(c),
+                  needsWeightCheck: store.needsCheck(c),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                        builder: (_) => CattleProfileScreen(cattle: c)),
+                  ),
+                ),
+              ),
             ],
           );
         },
