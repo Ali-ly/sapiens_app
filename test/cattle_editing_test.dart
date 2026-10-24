@@ -170,15 +170,15 @@ void main() {
     },
   );
   testWidgets(
-    'SAPITA brand is displayed for a new farm',
+    'SAPIENS brand is displayed for a new farm',
     (tester) async {
-      await tester.pumpWidget(SapitaApp(store: store));
+      await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
       expect(
         tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
-        'SAPITA',
+        'SAPIENS',
       );
-      expect(find.text('Selamat datang di SAPITA.'), findsOneWidget);
+      expect(find.text('Selamat datang di SAPIENS.'), findsOneWidget);
     },
   );
   testWidgets(
@@ -207,6 +207,7 @@ void main() {
         find.widgetWithText(TextFormField, 'Nama / ID sapi'),
         'Belum disimpan',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Kembali'));
       await tester.pumpAndSettle();
       expect(find.text('Perubahan belum disimpan'), findsOneWidget);

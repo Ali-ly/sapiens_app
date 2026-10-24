@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../groups/group_list_screen.dart';
 import 'add_cattle_screen.dart';
 import 'cattle_profile_screen.dart';
 
@@ -12,9 +13,11 @@ class CattleListScreen extends StatefulWidget {
     super.key,
     this.initialFilter = 'Semua',
     this.back = false,
+    this.filterRequest = 0,
   });
   final String initialFilter;
   final bool back;
+  final int filterRequest;
   @override
   State<CattleListScreen> createState() => _CattleListScreenState();
 }
@@ -34,6 +37,16 @@ class _CattleListScreenState extends State<CattleListScreen> {
   void initState() {
     super.initState();
     filter = widget.initialFilter;
+  }
+
+  @override
+  void didUpdateWidget(covariant CattleListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filterRequest != widget.filterRequest) {
+      filter = widget.initialFilter;
+      query = '';
+      search.clear();
+    }
   }
 
   @override
@@ -127,6 +140,17 @@ class _CattleListScreenState extends State<CattleListScreen> {
                   ),
                 ],
               ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                          builder: (_) => const GroupListScreen())),
+                  icon: const Icon(Icons.grid_view_rounded, size: 18),
+                  label: const Text('Kelompok/kandang (opsional)'),
+                ),
+              ),
               const SizedBox(height: 8),
               if (list.isEmpty)
                 EmptyPanel(
@@ -134,7 +158,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
                       ? 'Daftarkan sapi pertamamu'
                       : 'Sapi tidak ditemukan',
                   message: store.cattle.isEmpty
-                      ? 'Mulai dengan identitas sapi dan bobot awal bila tersedia.'
+                      ? 'Tambah identitas sapi, lalu catat bobot dan hitung pakannya. Tidak perlu membuat kandang.'
                       : 'Coba kata kunci atau filter yang berbeda.',
                   action: store.cattle.isEmpty
                       ? FilledButton(

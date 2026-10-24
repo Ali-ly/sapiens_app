@@ -7,14 +7,19 @@ import '../models/cattle_rules.dart';
 import '../models/farm_snapshot.dart';
 import '../models/feed_plan.dart';
 import '../models/feed_plan_rules.dart';
+import '../models/group_feed_plan.dart';
+import '../models/group_rules.dart';
+import '../models/legacy_group_membership.dart';
+import '../models/livestock_group.dart';
 import '../models/selected_image.dart';
+import 'legacy_group_migration.dart';
 
 /// Owns the persisted JSON schema. The same decoder validates imports and disk reads.
 class FarmBackupCodec {
   static Map<String, dynamic> encode(FarmSnapshot snapshot,
           {DateTime? exportedAt}) =>
       {
-        'schemaVersion': 2,
+        'schemaVersion': 4,
         'farmer': snapshot.farmer,
         'farm': snapshot.farm,
         'reminderDays': snapshot.reminderDays,
@@ -22,14 +27,23 @@ class FarmBackupCodec {
         if (exportedAt != null) 'exportedAt': exportedAt.toIso8601String(),
         'cattle': snapshot.cattle.map(_encodeCattle).toList(),
         'feedPlans': snapshot.feedPlans.map((plan) => plan.toJson()).toList(),
+        'groups': snapshot.groups.map((group) => group.toJson()).toList(),
+        'groupFeedPlans':
+            snapshot.groupFeedPlans.map((plan) => plan.toJson()).toList(),
+        'legacyMemberships': snapshot.legacyMemberships
+            .map((membership) => membership.toJson())
+            .toList(),
       };
-  static FarmSnapshot decode(String raw) {
+  static FarmSnapshot decode(String raw, {DateTime? migratedAt}) {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException('Format cadangan tidak dikenali.');
       }
-      if (decoded['schemaVersion'] != null && decoded['schemaVersion'] != 2) {
+      if (decoded['schemaVersion'] != null &&
+          decoded['schemaVersion'] != 2 &&
+          decoded['schemaVersion'] != 3 &&
+          decoded['schemaVersion'] != 4) {
         throw const FormatException('Versi cadangan belum didukung.');
       }
       final items = (decoded['cattle'] as List)
@@ -68,18 +82,55 @@ class FarmBackupCodec {
       if (days is! int || !CattleRules.reminderIntervals.contains(days)) {
         throw const FormatException('Interval pengecekan tidak valid.');
       }
-      return FarmSnapshot(
+      final version = decoded['schemaVersion'];
+      if ((version == 3 &&
+              (decoded['groups'] is! List ||
+                  decoded['memberships'] is! List)) ||
+          (version == 4 &&
+              (decoded['groups'] is! List ||
+                  decoded['legacyMemberships'] is! List ||
+                  decoded['groupFeedPlans'] is! List))) {
+        throw const FormatException(
+            'Data kelompok dalam cadangan tidak lengkap.');
+      }
+      final legacy = ((version == 4
+                  ? decoded['legacyMemberships']
+                  : decoded['memberships']) as List? ??
+              [])
+          .map((value) => LegacyGroupMembership.fromJson(
+              Map<String, dynamic>.from(value as Map)))
+          .toList();
+      final rawGroups = decoded['groups'] as List? ?? [];
+      final groups = version == 4
+          ? rawGroups
+              .map((value) => LivestockGroup.fromJson(
+                  Map<String, dynamic>.from(value as Map)))
+              .toList()
+          : LegacyGroupMigration.migrate(
+              rawGroups, legacy, items, migratedAt ?? DateTime.now());
+      final groupPlans = version == 4
+          ? (decoded['groupFeedPlans'] as List)
+              .map((value) => GroupFeedPlan.fromJson(
+                  Map<String, dynamic>.from(value as Map)))
+              .toList()
+          : <GroupFeedPlan>[];
+      final snapshot = FarmSnapshot(
         farmer: decoded['farmer'] as String,
         farm: decoded['farm'] as String,
         reminderDays: days,
         cattle: items,
         feedPlans: plans,
+        groups: groups,
+        legacyMemberships: legacy,
+        groupFeedPlans: groupPlans,
       );
+      GroupRules.validate(snapshot);
+      return snapshot;
     } on FormatException {
       rethrow;
     } catch (_) {
       throw const FormatException(
-        'Cadangan tidak dapat dibaca. Gunakan JSON hasil ekspor SAPITA.',
+        'Cadangan tidak dapat dibaca. Gunakan JSON hasil ekspor SAPIENS.',
       );
     }
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 
 class UnsavedChangesGuard extends StatefulWidget {
   const UnsavedChangesGuard(
@@ -15,7 +14,7 @@ class UnsavedChangesGuard extends StatefulWidget {
 
 class _UnsavedChangesGuardState extends State<UnsavedChangesGuard> {
   bool _allowLeave = false, _prompting = false;
-  Future<void> _handlePop(bool didPop) async {
+  Future<void> _handlePop(bool didPop, Object? result) async {
     if (didPop || _prompting || widget.busy) {
       return;
     }
@@ -56,7 +55,7 @@ class _UnsavedChangesGuardState extends State<UnsavedChangesGuard> {
   @override
   Widget build(BuildContext context) => PopScope(
         canPop: _allowLeave || !widget.dirty && !widget.busy,
-        onPopInvoked: _handlePop,
+        onPopInvokedWithResult: _handlePop,
         child: widget.child,
       );
 }

@@ -3,25 +3,37 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../models/cattle.dart';
-import '../../models/feed_plan.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
-import '../feed/feed_calculator_screen.dart';
+import '../../widgets/photo_preview.dart';
 import '../feed/feed_result_screen.dart';
 import 'add_cattle_screen.dart';
 import 'cattle_photo_screen.dart';
+import 'widgets/cattle_feed_panel.dart';
 import 'widgets/weight_chart.dart';
 import 'widgets/weight_entry_dialog.dart';
 
+enum CattleProfileSection { overview, weight, feed }
+
 class CattleProfileScreen extends StatefulWidget {
-  const CattleProfileScreen({super.key, required this.cattle});
+  const CattleProfileScreen(
+      {super.key,
+      required this.cattle,
+      this.initialSection = CattleProfileSection.overview});
   final Cattle cattle;
+  final CattleProfileSection initialSection;
   @override
   State<CattleProfileScreen> createState() => _CattleProfileScreenState();
 }
 
 class _CattleProfileScreenState extends State<CattleProfileScreen> {
-  int section = 0;
+  late int section;
+  @override
+  void initState() {
+    super.initState();
+    section = widget.initialSection.index;
+  }
+
   Future<void> manual(BuildContext context, Cattle c) async {
     final done = await showDialog<bool>(
       context: context,
@@ -52,6 +64,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
   }
 
   Future<void> remove(BuildContext context, Cattle c) async {
+    final store = FarmScope.read(context);
     final yes = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
@@ -74,7 +87,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
     );
     if (yes == true) {
       try {
-        await FarmScope.read(context).remove(c.id);
+        await store.remove(c.id);
         if (context.mounted) {
           Navigator.pop(context);
         }
@@ -279,7 +292,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                     ),
                   ),
                 const SectionHeading('Rencana pakan'),
-                feedPanel(context, c, plan, active),
+                CattleFeedPanel(cattle: c, plan: plan, active: active),
                 const SectionHeading('Catatan ternak'),
                 Panel(
                   child: Text(
@@ -297,16 +310,10 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                       separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (_, i) => ClipRRect(
                         borderRadius: BorderRadius.circular(21),
-                        child: Image.memory(
-                          c.images[i].bytes,
+                        child: PhotoPreview(
+                          image: c.images[i],
                           width: 170,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox(
-                            width: 170,
-                            child: Center(
-                              child: Icon(CupertinoIcons.photo),
-                            ),
-                          ),
                         ),
                       ),
                     ),
@@ -383,7 +390,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                   ),
               ] else ...[
                 const SectionHeading('Pakan untuk sapi ini'),
-                feedPanel(context, c, plan, active),
+                CattleFeedPanel(cattle: c, plan: plan, active: active),
                 if (history.isNotEmpty) ...[
                   const SectionHeading('Riwayat rencana'),
                   ...history.map(
@@ -435,76 +442,5 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
             ],
           );
         },
-      );
-  Widget feedPanel(
-          BuildContext context, Cattle c, FeedPlan? plan, bool active) =>
-      Panel(
-        color: AppColors.primarySoft,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.grass_rounded,
-                  color: AppColors.primary,
-                  size: 26,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        plan == null
-                            ? 'Dari bobot ke pakan'
-                            : '${kgLabel(plan.totalFreshKg)} kg / hari',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -.7,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        plan == null
-                            ? 'Hitung kebutuhan sesuai targetmu.'
-                            : active
-                                ? 'Rencana terkini siap digunakan.'
-                                : 'Perbarui rencana dengan data terbaru.',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                    builder: (_) => FeedCalculatorScreen(cattleId: c.id)),
-              ),
-              icon: const Icon(CupertinoIcons.arrow_right, size: 18),
-              label: Text(
-                plan == null ? 'Hitung kebutuhan pakan' : 'Hitung ulang pakan',
-              ),
-            ),
-            if (plan != null)
-              TextButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                      builder: (_) =>
-                          FeedResultScreen(plan: plan, saved: true)),
-                ),
-                child: const Text('Lihat rincian rencana'),
-              )
-          ],
-        ),
       );
 }

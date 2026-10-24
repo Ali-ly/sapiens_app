@@ -11,7 +11,7 @@ class FarmPage extends StatelessWidget {
       required this.children,
       this.action,
       this.back = false,
-      this.eyebrow = 'SAPITA · TEMAN PETERNAKANMU'});
+      this.eyebrow = 'SAPIENS · TEMAN PETERNAKANMU'});
   final String title, subtitle, eyebrow;
   final List<Widget> children;
   final Widget? action;

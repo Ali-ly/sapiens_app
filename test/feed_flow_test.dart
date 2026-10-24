@@ -21,7 +21,11 @@ void main() {
     await tester.scrollUntilVisible(
       finder,
       260,
-      scrollable: find.byType(Scrollable).last,
+      scrollable: find
+          .byWidgetPredicate((widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down)
+          .last,
       maxScrolls: 40,
     );
     await tester.ensureVisible(finder);
@@ -31,6 +35,8 @@ void main() {
   testWidgets(
     'Weight → feed request → result → saved cattle plan',
     (tester) async {
+      store = FarmStore(read: () async => null, write: (_) async {});
+      await store.load();
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -102,6 +108,8 @@ void main() {
   testWidgets(
     'Unsupported dedak-only selection shows validation without API request',
     (tester) async {
+      store = FarmStore(read: () async => null, write: (_) async {});
+      await store.load();
       final c = await store.saveCattle(
         Cattle(
           nameOrId: 'Budi',
@@ -150,10 +158,12 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+        store = FarmStore(read: () async => null, write: (_) async {});
+        await store.load();
         await store.addExamples();
-        await tester.pumpWidget(SapitaApp(store: store));
+        await tester.pumpWidget(SapiensApp(store: store));
         await tester.pumpAndSettle();
-        for (final label in ['Sapi', 'Pakan', 'Profil', 'Beranda']) {
+        for (final label in ['Ternak', 'Pakan', 'Profil', 'Ringkasan']) {
           await tester.tap(find.text(label).last);
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);

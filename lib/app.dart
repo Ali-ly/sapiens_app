@@ -8,15 +8,15 @@ import 'screens/main_screen.dart';
 import 'state/farm_scope.dart';
 import 'state/farm_store.dart';
 
-class SapitaApp extends StatefulWidget {
-  const SapitaApp({super.key, this.store});
+class SapiensApp extends StatefulWidget {
+  const SapiensApp({super.key, this.store});
   final FarmStore? store;
 
   @override
-  State<SapitaApp> createState() => _SapitaAppState();
+  State<SapiensApp> createState() => _SapiensAppState();
 }
 
-class _SapitaAppState extends State<SapitaApp> {
+class _SapiensAppState extends State<SapiensApp> {
   late final FarmStore _store;
   late final bool _ownsStore;
 

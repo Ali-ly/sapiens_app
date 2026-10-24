@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../cattle/add_cattle_screen.dart';
+import '../groups/group_list_screen.dart';
 import 'feed_calculator_screen.dart';
 import 'feed_result_screen.dart';
 import 'feed_shopping_screen.dart';
@@ -36,11 +37,11 @@ class FeedHubScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
-                        const StatusPill('RENCANA PAKAN', dark: true),
-                        const Spacer(),
-                        const Icon(
+                        StatusPill('RENCANA PAKAN', dark: true),
+                        Spacer(),
+                        Icon(
                           Icons.grass_rounded,
                           color: AppColors.accent,
                           size: 32,
@@ -237,7 +238,7 @@ class FeedHubScreen extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                   title: const Text(
-                    'Kebutuhan seluruh kandang',
+                    'Rekap kebutuhan pakan',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -253,6 +254,22 @@ class FeedHubScreen extends StatelessWidget {
                     MaterialPageRoute<void>(
                         builder: (_) => const FeedShoppingScreen()),
                   ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Panel(
+                padding: 4,
+                child: ListTile(
+                  leading: const Icon(Icons.grid_view_rounded),
+                  title: const Text('Pakan kelompok (opsional)'),
+                  subtitle: Text(store.activeGroups.isEmpty
+                      ? 'Untuk ternak banyak: gunakan jumlah dan bobot rata-rata.'
+                      : '${store.activeGroups.length} kelompok aktif · kelola rencana kelompok'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                          builder: (_) => const GroupListScreen())),
                 ),
               ),
               const SizedBox(height: 18),

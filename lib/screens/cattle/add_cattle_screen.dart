@@ -41,19 +41,20 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
     if (!form.currentState!.validate()) {
       return;
     }
+    final store = FarmScope.read(context);
     setState(() => busy = true);
     try {
       final old = widget.cattle;
       final kg = double.tryParse(weight.text.replaceAll(',', '.'));
       final saved = old != null
-          ? await FarmScope.read(context).updateIdentity(
+          ? await store.updateIdentity(
               old.id,
               name: name.text,
               gender: gender,
               ageMonths: int.parse(age.text.trim()),
               notes: notes.text,
             )
-          : await FarmScope.read(context).saveCattle(
+          : await store.saveCattle(
               Cattle(
                 nameOrId: name.text.trim(),
                 gender: gender,

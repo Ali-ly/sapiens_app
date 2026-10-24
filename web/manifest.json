@@ -1,11 +1,11 @@
 {
-  "name": "SAPITA",
-  "short_name": "SAPITA",
+  "name": "SAPIENS",
+  "short_name": "SAPIENS",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F6F7F2",
   "theme_color": "#202E25",
-  "description": "SAPITA — pantau bobot sapi dan rencanakan kebutuhan pakan.",
+  "description": "SAPIENS — pantau bobot sapi dan rencanakan kebutuhan pakan.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [

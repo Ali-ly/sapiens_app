@@ -46,6 +46,7 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> restore() async {
+    final store = FarmScope.read(context);
     setState(() => busy = true);
     try {
       final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
@@ -63,7 +64,7 @@ class _BackupScreenState extends State<BackupScreen> {
         builder: (ctx) => CupertinoAlertDialog(
           title: const Text('Pulihkan cadangan ini?'),
           content: Text(
-            '${data.farm}\n${data.cattle.length} sapi · ${data.feedPlans.length} rencana pakan\n\nSeluruh data di perangkat ini akan diganti dengan cadangan. Buat salinan data saat ini sebelum melanjutkan.',
+            '${data.farm}\n${data.cattle.length} sapi · ${data.feedPlans.length} rencana pakan\n${data.groups.length} kelompok/kandang · ${data.groupFeedPlans.length} rencana pakan kelompok\n\nSeluruh data di perangkat ini akan diganti dengan cadangan. Buat salinan data saat ini sebelum melanjutkan.',
           ),
           actions: [
             CupertinoDialogAction(
@@ -79,7 +80,7 @@ class _BackupScreenState extends State<BackupScreen> {
         ),
       );
       if (yes == true) {
-        await FarmScope.read(context).restoreBackup(text);
+        await store.restoreBackup(text);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

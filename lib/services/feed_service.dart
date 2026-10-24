@@ -72,11 +72,11 @@ class FeedService {
             'Perhitungan belum berhasil. Silakan coba lagi.',
       );
     } on TimeoutException {
-      throw ApiException(
+      throw const ApiException(
         'Perhitungan terlalu lama. Periksa koneksi lalu coba lagi.',
       );
     } on http.ClientException {
-      throw ApiException(
+      throw const ApiException(
         'Tidak dapat menghubungi layanan pakan. Periksa koneksi dan coba lagi.',
       );
     } finally {

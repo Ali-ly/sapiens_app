@@ -1,5 +1,5 @@
 name: sapita_app
-description: "SAPITA: pantau bobot sapi dan rencanakan kebutuhan pakan."
+description: "SAPIENS: pantau bobot sapi dan rencanakan kebutuhan pakan."
 publish_to: 'none'
 
 version: 1.0.0+1

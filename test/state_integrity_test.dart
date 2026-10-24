@@ -263,6 +263,13 @@ void main() {
   testWidgets(
     'Independent app trees receive their own store',
     (tester) async {
+      store = FarmStore(
+          now: () => now,
+          read: () async => memory,
+          write: (value) async {
+            memory = value;
+          });
+      await store.load();
       final other = FarmStore(read: () async => null, write: (_) async {});
       await other.load();
       await store.settings('Ali', 'Kandang Ali', 7);
@@ -297,9 +304,16 @@ void main() {
   testWidgets(
     'App disposal does not dispose a caller-owned store',
     (tester) async {
+      store = FarmStore(
+          now: () => now,
+          read: () async => memory,
+          write: (value) async {
+            memory = value;
+          });
+      await store.load();
       var notifications = 0;
       store.addListener(() => notifications++);
-      await tester.pumpWidget(SapitaApp(store: store));
+      await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
       await tester.pumpWidget(const SizedBox());
       await store.settings('Ali', 'Kandang Ali', 7);

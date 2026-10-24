@@ -7,22 +7,25 @@ import '../../models/selected_image.dart';
 import '../../services/image_service.dart';
 import '../../services/weight_service.dart';
 import '../../widgets/farm_ui.dart';
+import '../../widgets/photo_preview.dart';
 import 'cattle_estimate_result_screen.dart';
 
 class CattlePhotoScreen extends StatefulWidget {
   const CattlePhotoScreen({
     super.key,
     required this.draft,
+    this.imageService,
   });
 
   final Cattle draft;
+  final ImageService? imageService;
 
   @override
   State<CattlePhotoScreen> createState() => _CattlePhotoScreenState();
 }
 
 class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
-  final service = ImageService();
+  late final service = widget.imageService ?? ImageService();
   final List<SelectedImage> images = [];
 
   bool busy = false;
@@ -52,14 +55,16 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
           .take(4 - images.length)
           .toList();
 
-      setState(() {
-        images.addAll(accepted);
+      setState(
+        () {
+          images.addAll(accepted);
 
-        error = picked.length > accepted.length
-            ? 'Maksimal 4 foto, masing-masing hingga 8 MB. '
-                'Foto lainnya tidak ditambahkan.'
-            : null;
-      });
+          error = picked.length > accepted.length
+              ? 'Maksimal 4 foto, masing-masing hingga 8 MB. '
+                  'Foto lainnya tidak ditambahkan.'
+              : null;
+        },
+      );
     } catch (_) {
       if (mounted) {
         setState(
@@ -83,10 +88,12 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
       return;
     }
 
-    setState(() {
-      busy = true;
-      error = null;
-    });
+    setState(
+      () {
+        busy = true;
+        error = null;
+      },
+    );
 
     try {
       final estimate = await WeightService.predictWeight(images);
@@ -105,25 +112,17 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
         rejectedImages: estimate.rejectedImages,
       );
 
-      final saved = await Navigator.push<Cattle>(
+      Navigator.pushReplacement<Cattle, Cattle>(
         context,
-        MaterialPageRoute(
-          builder: (_) => CattleEstimateResultScreen(
-            draft: draft,
-          ),
-        ),
+        MaterialPageRoute<Cattle>(
+            builder: (_) => CattleEstimateResultScreen(draft: draft)),
       );
-
-      if (saved != null && mounted) {
-        Navigator.pop(context, saved);
-      }
     } catch (e) {
       if (mounted) {
         setState(
           () => error = errorMessage(
             e,
-            fallback:
-                'Estimasi belum berhasil. Periksa koneksi layanan, '
+            fallback: 'Estimasi belum berhasil. Periksa koneksi layanan, '
                 'lalu coba lagi dengan foto yang jelas.',
           ),
         );
@@ -142,18 +141,18 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
         eyebrow: 'CEK BOBOT · FOTO SAPI',
         back: true,
         children: [
-          Panel(
+          const Panel(
             color: AppColors.primarySoft,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   CupertinoIcons.camera,
                   color: AppColors.primary,
                   size: 30,
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                SizedBox(height: 16),
+                Text(
                   'Foto yang jelas,\nestimasi lebih terarah.',
                   style: TextStyle(
                     fontSize: 25,
@@ -161,8 +160,8 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                     letterSpacing: -.7,
                   ),
                 ),
-                const SizedBox(height: 14),
-                const Text(
+                SizedBox(height: 14),
+                Text(
                   'Ambil dari samping. Pastikan seluruh tubuh sapi terlihat, '
                   'pencahayaan cukup, dan sapi tidak tertutup objek lain.',
                   style: TextStyle(
@@ -171,11 +170,11 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: const [
+                  children: [
                     StatusPill('1–4 foto'),
                     StatusPill('Satu sapi per pengecekan'),
                   ],
@@ -183,32 +182,30 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
               ],
             ),
           ),
-
           SectionHeading(
             'Foto pengecekan',
             action: StatusPill('${images.length}/4 foto'),
           ),
-
           if (images.isEmpty)
-            Panel(
+            const Panel(
               child: Column(
                 children: [
-                  const SizedBox(height: 14),
-                  const Icon(
+                  SizedBox(height: 14),
+                  Icon(
                     CupertinoIcons.photo_on_rectangle,
                     color: AppColors.textSecondary,
                     size: 46,
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'Belum ada foto sapi',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: 8),
+                  Text(
                     'Pilih foto atau ambil langsung dengan kamera.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -216,7 +213,7 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                 ],
               ),
             )
@@ -235,12 +232,9 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.memory(
-                      images[i].bytes,
+                    PhotoPreview(
+                      image: images[i],
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Icon(CupertinoIcons.photo),
-                      ),
                     ),
                     Positioned(
                       right: 6,
@@ -266,9 +260,7 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                 ),
               ),
             ),
-
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
@@ -296,7 +288,6 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
               ),
             ],
           ),
-
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 16),
@@ -305,9 +296,7 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
                 warning: true,
               ),
             ),
-
           const SizedBox(height: 24),
-
           FilledButton.icon(
             onPressed: busy ? null : estimate,
             icon: busy
@@ -327,9 +316,7 @@ class _CattlePhotoScreenState extends State<CattlePhotoScreen> {
               busy ? 'Memproses…' : 'Estimasi bobot',
             ),
           ),
-
           const SizedBox(height: 16),
-
           const InfoBanner(
             'Foto digunakan untuk memperoleh estimasi bobot melalui layanan AI. '
             'Hasilnya menjadi dasar perkiraan pakan, '

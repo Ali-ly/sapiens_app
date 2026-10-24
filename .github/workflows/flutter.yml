@@ -23,8 +23,15 @@ jobs:
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
       - name: Test
         run: flutter test --coverage
+      - name: Browser regressions
+        run: >-
+          flutter test --platform chrome
+          test/app_flow_test.dart
+          test/command_center_test.dart
+          test/groups_ui_test.dart
+          test/photo_preview_test.dart
       - name: Build web
         run: flutter build web --release

@@ -6,9 +6,15 @@ import '../data/farm_backup_codec.dart';
 import '../data/sample_cattle.dart';
 import '../models/cattle.dart';
 import '../models/cattle_rules.dart';
+import '../models/farm_command_center.dart';
 import '../models/farm_snapshot.dart';
+import '../models/farm_status.dart';
 import '../models/feed_plan.dart';
 import '../models/feed_plan_rules.dart';
+import '../models/group_feed_plan.dart';
+import '../models/group_record.dart';
+import '../models/group_rules.dart';
+import '../models/livestock_group.dart';
 import '../models/selected_image.dart';
 import 'local_storage.dart' as storage;
 
@@ -34,6 +40,140 @@ class FarmStore extends ChangeNotifier {
 
   List<Cattle> get cattle => _snapshot.cattle;
   List<FeedPlan> get feedPlans => _snapshot.feedPlans;
+  List<LivestockGroup> get groups => _snapshot.groups;
+  List<LivestockGroup> get activeGroups =>
+      List.unmodifiable(groups.where((g) => !g.archived));
+  List<GroupFeedPlan> get groupFeedPlans => _snapshot.groupFeedPlans;
+  int get groupHeadCount => activeGroups.fold(0, (sum, g) => sum + g.headCount);
+  LivestockGroup? groupById(String id) {
+    for (final group in groups) {
+      if (group.id == id) {
+        return group;
+      }
+    }
+    return null;
+  }
+
+  GroupFeedPlan? latestGroupPlan(String id) {
+    GroupFeedPlan? latest;
+    for (final plan in groupFeedPlans.where((p) => p.groupId == id)) {
+      if (latest == null || !plan.createdAt.isBefore(latest.createdAt)) {
+        latest = plan;
+      }
+    }
+    return latest;
+  }
+
+  bool groupPlanReady(LivestockGroup group) =>
+      latestGroupPlan(group.id)?.matches(group) == true;
+  Map<String, double> get groupDailyFeedTotals {
+    final result = <String, double>{};
+    for (final group in activeGroups.where(groupPlanReady)) {
+      for (final portion in latestGroupPlan(group.id)!.groupPortions) {
+        result.update(portion.key, (kg) => kg + portion.asFedKg,
+            ifAbsent: () => portion.asFedKg);
+      }
+    }
+    return Map.unmodifiable(result);
+  }
+
+  String _newId(String kind) {
+    final existing = {
+      ...groups.map((g) => g.id),
+      ...groups.expand((g) => g.history).map((r) => r.id),
+      ...groupFeedPlans.map((p) => p.id)
+    };
+    String id;
+    do {
+      id = '$kind-${_now().microsecondsSinceEpoch}-${_idCounter++}';
+    } while (existing.contains(id));
+    return id;
+  }
+
+  Future<LivestockGroup> createGroup(String name,
+      {required int headCount,
+      double? averageWeightKg,
+      String target = 'pemeliharaan',
+      String notes = ''}) async {
+    late LivestockGroup created;
+    await _commit(() {
+      final now = _now().toUtc();
+      created = LivestockGroup(id: _newId('group'), createdAt: now, history: [
+        GroupRecord(
+            id: _newId('record'),
+            recordedAt: now,
+            name: name.trim(),
+            headCount: headCount,
+            averageWeightKg: averageWeightKg,
+            target: target,
+            notes: notes.trim())
+      ]);
+      return _snapshot.copyWith(groups: [...groups, created]);
+    });
+    return created;
+  }
+
+  Future<void> updateGroup(String id,
+          {required String name,
+          required int headCount,
+          required double? averageWeightKg,
+          required String target,
+          required String notes}) =>
+      _commit(() {
+        final group = groupById(id);
+        if (group == null || group.archived) {
+          throw StateError('Kelompok aktif tidak ditemukan.');
+        }
+        final record = group.current.copyWith(
+            id: _newId('record'),
+            recordedAt: _now().toUtc(),
+            name: name.trim(),
+            headCount: headCount,
+            averageWeightKg: averageWeightKg,
+            clearWeight: averageWeightKg == null,
+            target: target,
+            notes: notes.trim(),
+            source: 'manual');
+        return _snapshot.copyWith(
+            groups: groups
+                .map((g) => g.id == id ? group.append(record) : g)
+                .toList());
+      });
+  Future<void> archiveGroup(String id) => _setGroupArchive(id, true);
+  Future<void> restoreGroup(String id) => _setGroupArchive(id, false);
+  Future<void> _setGroupArchive(String id, bool archived) => _commit(() {
+        final group = groupById(id);
+        if (group == null) {
+          throw StateError('Kelompok tidak ditemukan.');
+        }
+        if (group.archived == archived) {
+          return _snapshot;
+        }
+        final now = _now().toUtc();
+        final record = group.current.copyWith(
+            id: _newId('record'),
+            recordedAt: now,
+            archivedAt: archived ? now : null,
+            clearArchive: !archived,
+            source: archived ? 'archive' : 'restore');
+        return _snapshot.copyWith(
+            groups: groups
+                .map((g) => g.id == id ? group.append(record) : g)
+                .toList());
+      });
+  Future<void> saveGroupPlan(GroupFeedPlan plan) => _commit(() {
+        final group = groupById(plan.groupId);
+        if (group == null || !plan.matches(group)) {
+          throw StateError(
+              'Data kelompok berubah. Hitung ulang pakan dengan data terkini.');
+        }
+        GroupRules.validatePlan(plan, group);
+        return _snapshot.copyWith(groupFeedPlans: [
+          ...groupFeedPlans.where((p) => p.id != plan.id),
+          plan
+        ]);
+      });
+
   String get farmer => _snapshot.farmer;
   String get farm => _snapshot.farm;
   int get reminderDays => _snapshot.reminderDays;
@@ -55,7 +195,9 @@ class FarmStore extends ChangeNotifier {
     _error = null;
     try {
       final raw = await _read();
-      final next = raw == null ? FarmSnapshot() : FarmBackupCodec.decode(raw);
+      final next = raw == null
+          ? FarmSnapshot()
+          : FarmBackupCodec.decode(raw, migratedAt: _now());
       _snapshot = next;
     } catch (_) {
       _error =
@@ -74,22 +216,14 @@ class FarmStore extends ChangeNotifier {
     return null;
   }
 
-  FeedPlan? latestPlan(String cattleId) {
-    FeedPlan? latest;
-    for (final plan in feedPlans) {
-      if (plan.cattleId == cattleId &&
-          (latest == null || !plan.createdAt.isBefore(latest.createdAt))) {
-        latest = plan;
-      }
-    }
-    return latest;
-  }
-
+  FeedPlan? latestPlan(String cattleId) =>
+      FarmStatus.latestPlan(feedPlans, cattleId);
   bool needsCheck(Cattle animal) =>
-      animal.history.isEmpty ||
-      _now().difference(animal.history.last.date).inDays >= reminderDays;
+      FarmStatus.needsWeightCheck(animal, _now(), reminderDays);
   bool planReady(Cattle animal) =>
-      latestPlan(animal.id)?.matches(animal) == true && !needsCheck(animal);
+      FarmStatus.planReady(animal, latestPlan(animal.id), _now(), reminderDays);
+  FarmCommandCenter get commandCenter =>
+      FarmCommandCenter.fromSnapshot(_snapshot, _now());
   int get checksThisWeek {
     final now = _now();
     return cattle.fold(
@@ -135,6 +269,7 @@ class FarmStore extends ChangeNotifier {
           throw StateError(_error!);
         }
         final next = build();
+        GroupRules.validate(next);
         await _write(jsonEncode(FarmBackupCodec.encode(next)));
         _snapshot = next;
         _error = null;
@@ -146,10 +281,7 @@ class FarmStore extends ChangeNotifier {
     return operation;
   }
 
-  FarmSnapshot _withCattle(List<Cattle> animals) => FarmSnapshot(
-        farmer: farmer,
-        farm: farm,
-        reminderDays: reminderDays,
+  FarmSnapshot _withCattle(List<Cattle> animals) => _snapshot.copyWith(
         cattle: animals,
         feedPlans: feedPlans
             .where(
@@ -279,10 +411,7 @@ class FarmStore extends ChangeNotifier {
               'Data sapi berubah. Hitung ulang pakan dengan bobot terbaru.',
             );
           }
-          return FarmSnapshot(
-            farmer: farmer,
-            farm: farm,
-            reminderDays: reminderDays,
+          return _snapshot.copyWith(
             cattle: cattle,
             feedPlans: [
               ...feedPlans.where((other) => other.id != plan.id),
@@ -314,7 +443,7 @@ class FarmStore extends ChangeNotifier {
               !CattleRules.reminderIntervals.contains(days)) {
             throw ArgumentError('Preferensi peternakan tidak valid.');
           }
-          return FarmSnapshot(
+          return _snapshot.copyWith(
             farmer: name.trim(),
             farm: farmName.trim(),
             reminderDays: days,
@@ -326,7 +455,7 @@ class FarmStore extends ChangeNotifier {
   Map<String, dynamic> exportData() =>
       FarmBackupCodec.encode(_snapshot, exportedAt: _now());
   Future<void> restoreBackup(String raw) async {
-    final restored = FarmBackupCodec.decode(raw);
+    final restored = FarmBackupCodec.decode(raw, migratedAt: _now());
     await _commit(() => restored, recovering: true);
   }
 

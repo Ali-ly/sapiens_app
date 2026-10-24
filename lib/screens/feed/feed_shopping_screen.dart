@@ -8,35 +8,62 @@ import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 
 class FeedShoppingScreen extends StatefulWidget {
-  const FeedShoppingScreen({super.key});
+  const FeedShoppingScreen({super.key, this.initialGroupScope = false});
+  final bool initialGroupScope;
   @override
   State<FeedShoppingScreen> createState() => _FeedShoppingScreenState();
 }
 
 class _FeedShoppingScreenState extends State<FeedShoppingScreen> {
   int days = 7;
+  late bool groupScope = widget.initialGroupScope;
   final Set<String> checked = {};
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: FarmScope.read(context),
         builder: (context, _) {
           final store = FarmScope.read(context);
-          final totals = store.dailyFeedTotals;
-          final count = store.cattle.where(store.planReady).length;
+          final grouped = groupScope;
+          final totals =
+              grouped ? store.groupDailyFeedTotals : store.dailyFeedTotals;
+          final count = grouped
+              ? store.activeGroups.where(store.groupPlanReady).length
+              : store.cattle.where(store.planReady).length;
+          final totalCount =
+              grouped ? store.activeGroups.length : store.cattle.length;
+          final scopeLabel = grouped ? 'kelompok' : 'profil individual';
           final sum = totals.values.fold(0.0, (a, b) => a + b) * days;
           return FarmPage(
             title: 'Persiapan pakan',
-            subtitle: 'Satu daftar bahan untuk seluruh kandang.',
+            subtitle:
+                'Rekap kelompok dan profil individual dipisahkan agar tidak dihitung dua kali.',
             eyebrow: 'REKAP KEBUTUHAN',
             back: true,
             children: [
+              Wrap(spacing: 8, children: [
+                ChoiceChip(
+                    label: const Text('Individual'),
+                    selected: !grouped,
+                    onSelected: (_) => setState(() {
+                          groupScope = false;
+                          checked.clear();
+                        })),
+                ChoiceChip(
+                    label: const Text('Kelompok'),
+                    selected: grouped,
+                    onSelected: (_) => setState(() {
+                          groupScope = true;
+                          checked.clear();
+                        }))
+              ]),
+              const SizedBox(height: 12),
               Panel(
                 color: AppColors.primaryDark,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     StatusPill(
-                      '$count sapi dengan rencana terkini',
+                      '$count $scopeLabel dengan rencana terkini',
                       dark: true,
                     ),
                     const SizedBox(height: 20),
@@ -88,11 +115,11 @@ class _FeedShoppingScreenState extends State<FeedShoppingScreen> {
                   }
                 },
               ),
-              if (count < store.cattle.length)
+              if (count < totalCount)
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: InfoBanner(
-                    '${store.cattle.length - count} sapi belum masuk rekap karena belum memiliki rencana terkini atau bobotnya perlu dicek.',
+                    '${totalCount - count} $scopeLabel belum masuk rekap karena belum memiliki rencana terkini.',
                     warning: true,
                   ),
                 ),
@@ -101,7 +128,7 @@ class _FeedShoppingScreenState extends State<FeedShoppingScreen> {
                 const EmptyPanel(
                   title: 'Belum ada rencana siap pakai',
                   message:
-                      'Hitung dan simpan rencana pakan tiap sapi terlebih dahulu. Rekap akan muncul di sini.',
+                      'Hitung dan simpan rencana pakan pada cakupan yang dipilih terlebih dahulu. Rekap akan muncul di sini.',
                 ),
               ...totals.entries.map(
                 (e) => Padding(
@@ -141,7 +168,7 @@ class _FeedShoppingScreenState extends State<FeedShoppingScreen> {
               ),
               const SizedBox(height: 12),
               const InfoBanner(
-                'Jumlah dijumlahkan dari rencana terbaru setiap sapi, lalu dikalikan jumlah hari. Perbarui jika bobot atau kebutuhan berubah. Tanda centang hanya membantu persiapan selama halaman ini terbuka.',
+                'Takaran dijumlahkan dari rencana terkini pada cakupan terpilih, lalu dikalikan jumlah hari. Perbarui jika bobot atau kebutuhan berubah. Tanda centang hanya membantu persiapan selama halaman ini terbuka.',
               ),
               const SizedBox(height: 18),
               OutlinedButton.icon(
@@ -152,7 +179,7 @@ class _FeedShoppingScreenState extends State<FeedShoppingScreen> {
                           await Clipboard.setData(
                             ClipboardData(
                               text:
-                                  'Kebutuhan pakan ${store.farm}\n$count sapi · $days hari\n${totals.entries.map((e) => '${feedLabels[e.key] ?? e.key}: ${kgLabel(e.value * days)} kg').join('\n')}\nTotal ${kgLabel(sum)} kg pakan segar',
+                                  'Kebutuhan pakan ${store.farm}\n$count $scopeLabel · $days hari\n${totals.entries.map((e) => '${feedLabels[e.key] ?? e.key}: ${kgLabel(e.value * days)} kg').join('\n')}\nTotal ${kgLabel(sum)} kg pakan segar',
                             ),
                           );
                           if (context.mounted) {

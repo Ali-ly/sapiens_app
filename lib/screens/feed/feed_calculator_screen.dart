@@ -8,7 +8,7 @@ import '../../services/feed_service.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../cattle/add_cattle_screen.dart';
-import '../cattle/cattle_profile_screen.dart';
+import '../cattle/widgets/weight_entry_dialog.dart';
 import 'feed_result_screen.dart';
 
 typedef FeedCalculation = Future<FeedPlan> Function(
@@ -94,7 +94,13 @@ class _FeedCalculatorScreenState extends State<FeedCalculatorScreen> {
         context,
         MaterialPageRoute(builder: (_) => FeedResultScreen(plan: plan)),
       );
-      if (done == true && mounted) {
+      if (!mounted) {
+        return;
+      }
+      final persisted =
+          FarmScope.read(context).feedPlans.any((saved) => saved.id == plan.id);
+      // Back after a successful save completes this flow just like "Selesai".
+      if (done == true || persisted) {
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -218,11 +224,10 @@ class _FeedCalculatorScreenState extends State<FeedCalculatorScreen> {
                             TextButton(
                               onPressed: busy
                                   ? null
-                                  : () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                CattleProfileScreen(cattle: c)),
+                                  : () => showDialog<bool>(
+                                        context: context,
+                                        builder: (_) =>
+                                            WeightEntryDialog(cattle: c),
                                       ),
                               child: Text(
                                 c.estimatedWeight == null

@@ -221,7 +221,7 @@ class UserProfileScreen extends StatelessWidget {
                     const Divider(indent: 56, endIndent: 15, height: 1),
                     _item(
                       CupertinoIcons.book,
-                      'Cara menggunakan SAPITA',
+                      'Cara menggunakan SAPIENS',
                       'Alur bobot, kebutuhan pakan, dan pemantauan',
                       () => guide(context),
                     ),
@@ -234,23 +234,6 @@ class UserProfileScreen extends StatelessWidget {
                         () => removeExamples(context),
                       ),
                     ],
-                    if (store.cattle.isEmpty) ...[
-                      const Divider(indent: 56, endIndent: 15, height: 1),
-                      _item(
-                        CupertinoIcons.sparkles,
-                        'Jelajahi data contoh',
-                        'Coba fitur dengan 5 sapi simulasi',
-                        () async {
-                          try {
-                            await store.addExamples();
-                          } catch (e) {
-                            if (context.mounted) {
-                              showError(context, e);
-                            }
-                          }
-                        },
-                      )
-                    ]
                   ],
                 ),
               ),
@@ -261,7 +244,7 @@ class UserProfileScreen extends StatelessWidget {
               const SizedBox(height: 28),
               const Center(
                 child: Text(
-                  'SAPITA',
+                  'SAPIENS',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

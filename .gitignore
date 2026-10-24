@@ -57,3 +57,8 @@ app.*.map.json
 /flutter_*.png
 /exports/
 /backups/
+
+# Test reports and local editor state
+/coverage/
+/test-results/
+*.lcov

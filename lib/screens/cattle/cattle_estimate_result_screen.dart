@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../models/cattle.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../../widgets/photo_preview.dart';
 import '../feed/feed_calculator_screen.dart';
 
 class CattleEstimateResultScreen extends StatefulWidget {
@@ -47,15 +48,12 @@ class _CattleEstimateResultScreenState
       }
       setState(() => saved = result);
       if (feed) {
-        final done = await Navigator.push<bool>(
+        Navigator.pushReplacement<bool, Cattle>(
           context,
-          MaterialPageRoute(
-            builder: (_) => FeedCalculatorScreen(cattleId: result.id),
-          ),
+          MaterialPageRoute<bool>(
+              builder: (_) => FeedCalculatorScreen(cattleId: result.id)),
+          result: result,
         );
-        if (done == true && mounted) {
-          Navigator.pop(context, result);
-        }
       } else {
         Navigator.pop(context, result);
       }
@@ -126,17 +124,17 @@ class _CattleEstimateResultScreenState
           ),
         ),
         const SizedBox(height: 18),
-        Panel(
+        const Panel(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.grass_rounded,
                 color: AppColors.primary,
                 size: 27,
               ),
-              const SizedBox(width: 13),
-              const Expanded(
+              SizedBox(width: 13),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -173,8 +171,8 @@ class _CattleEstimateResultScreenState
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (_, i) => ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.memory(
-                  d.latestCheckImages[i].bytes,
+                child: PhotoPreview(
+                  image: d.latestCheckImages[i],
                   width: 130,
                   fit: BoxFit.cover,
                 ),

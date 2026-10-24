@@ -6,7 +6,7 @@ class SelectedImage {
   SelectedImage({
     required this.file,
     required Uint8List bytes,
-  }) : bytes = Uint8List.fromList(bytes);
+  }) : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
 
   final XFile file;
   final Uint8List bytes;

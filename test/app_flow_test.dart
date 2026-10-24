@@ -114,24 +114,24 @@ void main() {
     (
       tester,
     ) async {
+      store = FarmStore(
+          read: () async => saved,
+          write: (value) async {
+            saved = value;
+          });
+      await store.load();
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(SapitaApp(store: store));
+      await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('Belum ada sapi'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.text('Belum ada sapi'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('Tambah sapi'),
-        -200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Tambah sapi'));
+      expect(find.text('Tambah sapi pertama'), findsOneWidget);
+      expect(find.text('Coba dengan data contoh'), findsNothing);
+      expect(find.text('Tambah sapi → bobot → pakan → riwayat'), findsNothing);
+      await tester.tap(find.text('Ternak').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Tambah sapi'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Nama / ID sapi'),
@@ -146,12 +146,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(store.cattle.length, 1);
       expect(find.text('Catat bobot manual'), findsOneWidget);
-      await tester.pageBack();
+      await tester.tap(find.byTooltip('Kembali'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sapi').last);
+      await tester.tap(find.text('Ternak').last);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'Raka');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('B006 - Raka'));
+      await tester.pump(const Duration(seconds: 4));
       await tester.tap(find.text('B006 - Raka'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(

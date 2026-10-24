@@ -44,11 +44,11 @@ class WeightService {
       );
       return WeightEstimate.fromJson(data, imageCount: images.length);
     } on TimeoutException {
-      throw ApiException(
+      throw const ApiException(
         'Estimasi terlalu lama. Coba lagi dengan koneksi yang stabil.',
       );
     } on http.ClientException {
-      throw ApiException(
+      throw const ApiException(
         'Tidak dapat menghubungi layanan estimasi. Periksa koneksi lalu coba lagi.',
       );
     } finally {

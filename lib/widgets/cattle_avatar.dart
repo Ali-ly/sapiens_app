@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
 import '../models/cattle.dart';
+import 'photo_preview.dart';
 
 class CattleAvatar extends StatelessWidget {
   const CattleAvatar({super.key, required this.cattle, this.size = 58});
@@ -17,8 +18,8 @@ class CattleAvatar extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: cattle.images.isNotEmpty
-            ? Image.memory(
-                cattle.images.first.bytes,
+            ? PhotoPreview(
+                image: cattle.images.first,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) =>
                     CustomPaint(painter: CowPortrait()),
