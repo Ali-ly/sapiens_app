@@ -10,6 +10,8 @@ import 'package:sapiens_app/app/app.dart';
 import 'package:sapiens_app/app/theme.dart';
 import 'package:sapiens_app/application/providers.dart';
 import 'package:sapiens_app/domain/value.dart';
+import 'package:sapiens_app/domain/records.dart';
+import 'package:sapiens_app/api/contracts.dart';
 import 'package:sapiens_app/features/cattle/profile_page.dart';
 import 'package:sapiens_app/features/feed/result_page.dart';
 import '../test/helpers/harness.dart';
@@ -40,7 +42,8 @@ void main() {
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
     Future<void> capture(String name, Harness h, Widget page,
-        {bool app = false}) async {
+        {bool app = false, double width = 390, double textScale = 1}) async {
+      t.view.physicalSize = Size(width, width > 600 ? 960 : 844);
       final key = GlobalKey();
       await t.pumpWidget(UncontrolledProviderScope(
           container: h.container,
@@ -51,6 +54,10 @@ void main() {
                   : MaterialApp(
                       debugShowCheckedModeBanner: false,
                       theme: sapiensTheme(),
+                      builder: (context, child) => MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                              textScaler: TextScaler.linear(textScale)),
+                          child: child!),
                       home: page))));
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
@@ -81,7 +88,13 @@ void main() {
           userId: 'SP-001',
           ageMonths: 24,
           sex: c.sex);
-      final evaluation = await h.evaluate(c.id);
+      final evaluation = await h.controller.evaluate(
+          c.id,
+          [
+            FeedAmount('rumput_gajah', mode == FarmMode.beef ? 25 : 30),
+            FeedAmount('dedak_padi_bekatul', mode == FarmMode.beef ? 3 : 4),
+          ],
+          await h.gateway.feeds(mode));
       await capture('${mode.name}-home', h, const SapiensApp(), app: true);
       await capture(
           '${mode.name}-profile', h, CattleProfilePage(cattleId: c.id));
@@ -91,7 +104,58 @@ void main() {
           EvaluationResultPage(
               evaluation: evaluation,
               cattleName: mode == FarmMode.beef ? 'Bima' : 'Sari'));
+      await capture(
+          '${mode.name}-result-wide',
+          h,
+          EvaluationResultPage(
+              evaluation: evaluation,
+              cattleName: mode == FarmMode.beef ? 'Bima' : 'Sari'),
+          width: 1280);
+      if (mode == FarmMode.beef) {
+        final screenshotExample = NutritionEvaluation(
+            id: 'screenshot-example',
+            createdAt: h.now,
+            contextHash: 'presentation-only',
+            contextSnapshot: const {},
+            request: const {
+              'production_category': 'beef',
+              'cattle': {'body_weight_kg': 200},
+              'feed_items': []
+            },
+            response: const {
+              'status': 'ok',
+              'production_category': 'beef',
+              'adequacy': {
+                'dry_matter': {
+                  'requirement': 5.60,
+                  'supply': 0.41,
+                  'unit': 'kg/day',
+                  'adequacy_pct': 7.26,
+                  'profile_coverage_fraction': 1,
+                  'status': 'deficient'
+                }
+              }
+            });
+        await capture(
+            'screenshot-case-result',
+            h,
+            EvaluationResultPage(
+                evaluation: screenshotExample, cattleName: 'Sapi uji'));
+      }
       if (mode == FarmMode.dairy) {
+        await capture(
+            'dairy-profile-desktop', h, CattleProfilePage(cattleId: c.id),
+            width: 1280);
+        await capture(
+            'dairy-profile-tablet', h, CattleProfilePage(cattleId: c.id),
+            width: 768);
+        await capture(
+            'dairy-profile-compact', h, CattleProfilePage(cattleId: c.id),
+            width: 320);
+        await capture(
+            'dairy-profile-large-text', h, CattleProfilePage(cattleId: c.id),
+            width: 390, textScale: 2);
+
         await capture('dairy-milk', h,
             CattleProfilePage(cattleId: c.id, initial: ProfileSection.milk));
       }

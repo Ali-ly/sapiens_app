@@ -27,37 +27,56 @@ class PageFrame extends StatelessWidget {
       required this.children,
       this.subtitle,
       this.actions,
-      this.back = true});
+      this.back = true,
+      this.maxWidth = AppLayout.formWidth});
   final String title;
   final String? subtitle;
   final List<Widget> children;
   final List<Widget>? actions;
   final bool back;
+  final double maxWidth;
   @override
-  Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(
-          automaticallyImplyLeading: back,
-          title: Text(title,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 21)),
-          actions: actions),
-      body: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                  children: [
-                    if (subtitle != null)
-                      Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
-                          child: Text(subtitle!,
-                              style: const TextStyle(
-                                  color: Palette.muted, height: 1.5))),
-                    ...children
-                  ]))));
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final gutter = AppLayout.gutter(width);
+    return Scaffold(
+        appBar: AppBar(
+            automaticallyImplyLeading: back,
+            titleSpacing: width > maxWidth
+                ? ((width - maxWidth) / 2 +
+                        gutter -
+                        (back && Navigator.canPop(context) ? 56 : 0))
+                    .clamp(16, double.infinity)
+                : 20,
+            title: Text(title),
+            actions: actions == null
+                ? null
+                : [
+                    ...actions!,
+                    if (width > maxWidth)
+                      SizedBox(width: (width - maxWidth) / 2 + gutter - 8),
+                  ]),
+        body: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 40),
+                    children: [
+                      if (subtitle != null)
+                        Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpace.section),
+                            child: Text(subtitle!,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: Palette.muted))),
+                      ...children
+                    ]))));
+  }
 }
 
 class Surface extends StatelessWidget {
@@ -77,7 +96,7 @@ class Surface extends StatelessWidget {
       child: Material(
           color: color,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(AppLayout.radius),
               side: BorderSide(
                   color: color == Colors.white
                       ? Palette.line
@@ -94,33 +113,55 @@ class Heading extends StatelessWidget {
   final Widget? action;
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 14),
-      child: Row(children: [
-        Expanded(
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -.3))),
-        if (action != null) action!
-      ]));
+      padding:
+          const EdgeInsets.only(top: AppSpace.section, bottom: AppSpace.medium),
+      child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            Semantics(
+                header: true,
+                child: Text(text,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -.3))),
+            if (action != null) action!
+          ]));
 }
 
 class Notice extends StatelessWidget {
-  const Notice(this.text, {super.key, this.warning = false});
+  const Notice(this.text,
+      {super.key, this.warning = false, this.error = false});
   final String text;
-  final bool warning;
+  final bool warning, error;
   @override
   Widget build(BuildContext context) => Surface(
-      color: warning ? const Color(0xFFFFF0D9) : const Color(0xFFE9F0E5),
+      color: error
+          ? Palette.errorSurface
+          : warning
+              ? Palette.warningSurface
+              : Palette.leaf,
       padding: 16,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(warning ? Icons.info_outline : Icons.lightbulb_outline,
-            size: 20, color: warning ? Palette.amber : Palette.ink),
+        Icon(
+            error
+                ? Icons.error_outline
+                : warning
+                    ? Icons.info_outline
+                    : Icons.lightbulb_outline,
+            size: 20,
+            color: error
+                ? Palette.error
+                : warning
+                    ? Palette.amber
+                    : Palette.ink),
         const SizedBox(width: 10),
         Expanded(
             child:
-                Text(text, style: const TextStyle(height: 1.5, fontSize: 13)))
+                Text(text, style: const TextStyle(height: 1.5, fontSize: 14)))
       ]));
 }
 
@@ -145,18 +186,18 @@ class EmptyMessage extends StatelessWidget {
 }
 
 class Tag extends StatelessWidget {
-  const Tag(this.text, {super.key, this.warning = false});
+  const Tag(this.text, {super.key, this.warning = false, this.error = false});
   final String text;
-  final bool warning;
+  final bool warning, error;
   @override
   Widget build(BuildContext context) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-          color: warning ? const Color(0xFFFFE6C2) : Palette.leaf,
+          color: warning ? Palette.warningSurface : Palette.leaf,
           borderRadius: BorderRadius.circular(9)),
       child: Text(text,
           style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: warning ? Palette.amber : Palette.ink)));
 }
@@ -167,39 +208,139 @@ class Metric extends StatelessWidget {
       required this.label,
       required this.value,
       this.detail,
-      this.onTap});
+      this.onTap,
+      this.textValue = false});
   final String label, value;
   final String? detail;
   final VoidCallback? onTap;
+  final bool textValue;
   @override
   Widget build(BuildContext context) => Surface(
       onTap: onTap,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Palette.muted)),
-        const SizedBox(height: 10),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 27, fontWeight: FontWeight.w700, letterSpacing: -.8)),
-        if (detail != null) ...[
-          const SizedBox(height: 7),
-          Text(detail!,
-              style: const TextStyle(
-                  fontSize: 12, color: Palette.muted, height: 1.4))
-        ]
-      ]));
+      child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 104),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 13, color: Palette.muted, height: 1.4)),
+            const SizedBox(height: 10),
+            Text(value,
+                style: TextStyle(
+                    fontSize: textValue ? 20 : 26,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.5,
+                    fontFeatures: const [FontFeature.tabularFigures()])),
+            if (detail != null) ...[
+              const SizedBox(height: 10),
+              Text(detail!,
+                  style: const TextStyle(
+                      fontSize: 12, color: Palette.muted, height: 1.5))
+            ]
+          ])));
 }
 
 class MetricGrid extends StatelessWidget {
   const MetricGrid({super.key, required this.children});
   final List<Widget> children;
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-      builder: (context, c) => Wrap(spacing: 12, children: [
-            for (final child in children)
-              SizedBox(
-                  width: c.maxWidth < 350 ? c.maxWidth : (c.maxWidth - 12) / 2,
-                  child: child)
-          ]));
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
+        final scaled = MediaQuery.textScalerOf(context).scale(14) / 14;
+        final columns = c.maxWidth < 330 || scaled > 1.3
+            ? 1
+            : c.maxWidth >= 840 && children.length > 2
+                ? 4
+                : 2;
+        return Column(children: [
+          for (var start = 0; start < children.length; start += columns)
+            IntrinsicHeight(
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  for (var i = start; i < start + columns; i++) ...[
+                    if (i > start) const SizedBox(width: AppSpace.medium),
+                    Expanded(
+                        child: i < children.length
+                            ? children[i]
+                            : const SizedBox.shrink())
+                  ]
+                ]))
+        ]);
+      });
+}
+
+/// Navigation tabs share anatomy while retaining Material keyboard/selection semantics.
+class SectionTab extends StatelessWidget {
+  const SectionTab(
+      {super.key,
+      required this.label,
+      required this.selected,
+      required this.onSelected,
+      this.chipKey});
+  final String label;
+  final bool selected;
+  final ValueChanged<bool>? onSelected;
+  final Key? chipKey;
+  @override
+  Widget build(BuildContext context) => Container(
+      decoration: BoxDecoration(
+          border: Border(
+              bottom: BorderSide(
+                  color: selected ? Palette.ink : Colors.transparent,
+                  width: 2))),
+      child: ChoiceChip(
+          key: chipKey,
+          label: Text(label),
+          selected: selected,
+          onSelected: onSelected,
+          color: const WidgetStatePropertyAll(Palette.cream),
+          showCheckmark: false,
+          backgroundColor: Palette.cream,
+          selectedColor: Palette.cream,
+          disabledColor: Palette.cream,
+          side: BorderSide.none,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+          labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: onSelected == null
+                  ? Palette.muted.withOpacity(.6)
+                  : selected
+                      ? Palette.ink
+                      : Palette.muted),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))));
+}
+
+class LoadingState extends StatelessWidget {
+  const LoadingState({super.key});
+  @override
+  Widget build(BuildContext context) => Semantics(
+      label: 'Memuat data',
+      liveRegion: true,
+      child: Center(
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        LinearProgressIndicator(
+                            value: MediaQuery.disableAnimationsOf(context)
+                                ? .5
+                                : null,
+                            backgroundColor: Palette.leaf,
+                            color: Palette.ink,
+                            minHeight: 3),
+                        const SizedBox(height: 20),
+                        const Text('Memuat data…',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Palette.muted)),
+                      ])))));
 }
 
 class SubmitButton extends StatefulWidget {
@@ -208,11 +349,12 @@ class SubmitButton extends StatefulWidget {
       required this.label,
       required this.submit,
       this.icon = Icons.check,
-      this.enabled = true});
+      this.enabled = true,
+      this.secondary = false});
   final String label;
   final Future<void> Function() submit;
   final IconData icon;
-  final bool enabled;
+  final bool enabled, secondary;
   @override
   State<SubmitButton> createState() => _SubmitButtonState();
 }
@@ -235,20 +377,26 @@ class _SubmitButtonState extends State<SubmitButton> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (error != null) Notice(error!, warning: true),
-        FilledButton.icon(
-            onPressed: busy || !widget.enabled ? null : run,
-            icon: busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : Icon(widget.icon, size: 20),
-            label: Text(busy ? 'Memproses…' : widget.label))
-      ]);
+  Widget build(BuildContext context) {
+    final icon = busy
+        ? SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: widget.secondary ? Palette.ink : Colors.white))
+        : Icon(widget.icon, size: 20);
+    final label = Text(busy ? 'Memproses…' : widget.label);
+    final submit = busy || !widget.enabled ? null : run;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (error != null)
+        Semantics(liveRegion: true, child: Notice(error!, error: true)),
+      if (widget.secondary)
+        OutlinedButton.icon(onPressed: submit, icon: icon, label: label)
+      else
+        FilledButton.icon(onPressed: submit, icon: icon, label: label)
+    ]);
+  }
 }
 
 Future<String?> chooseDay(BuildContext context, String current,

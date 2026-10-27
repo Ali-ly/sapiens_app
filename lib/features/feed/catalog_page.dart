@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/contracts.dart';
 import '../../application/providers.dart';
@@ -69,6 +70,7 @@ class _FeedCatalogPageState extends ConsumerState<FeedCatalogPage> {
     final mode = ref.watch(farmProvider).requireValue.account!.mode;
     final catalog = ref.watch(feedCatalogProvider(mode));
     return PageFrame(
+        maxWidth: AppLayout.contentWidth,
         title: 'Daftar Bahan Pakan',
         subtitle: mode.label,
         children: [
@@ -78,9 +80,9 @@ class _FeedCatalogPageState extends ConsumerState<FeedCatalogPage> {
               onChanged: (v) => setState(() => query = v)),
           const SizedBox(height: 16),
           catalog.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const LoadingState(),
               error: (e, _) => Column(children: [
-                    Notice(errorText(e), warning: true),
+                    Notice(errorText(e), error: true),
                     OutlinedButton(
                         onPressed: () =>
                             ref.invalidate(feedCatalogProvider(mode)),

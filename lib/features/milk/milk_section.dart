@@ -103,12 +103,16 @@ class MilkSection extends ConsumerWidget {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              Row(children: [
-                Expanded(
-                    child: Text(dayText(r.date),
-                        style: const TextStyle(fontWeight: FontWeight.w700))),
-                Tag(r.complete ? 'Lengkap' : 'Parsial', warning: !r.complete)
-              ]),
+              Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    Text(dayText(r.date),
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    Tag(r.complete ? 'Lengkap' : 'Parsial',
+                        warning: !r.complete)
+                  ]),
               const SizedBox(height: 10),
               Text('${number(r.recordedAmount)} ${r.unit.label}',
                   style: const TextStyle(

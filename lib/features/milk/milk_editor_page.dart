@@ -112,6 +112,8 @@ class _MilkEditorPageState extends ConsumerState<MilkEditorPage> {
                     })),
             const SizedBox(height: 16),
             DropdownButtonFormField<MilkUnit>(
+                isExpanded: true,
+                itemHeight: null,
                 value: unit,
                 decoration:
                     const InputDecoration(labelText: 'Satuan pengukuran'),

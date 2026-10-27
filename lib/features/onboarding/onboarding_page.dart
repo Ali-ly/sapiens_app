@@ -22,11 +22,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           children: [
             const SizedBox(height: 20),
             const Icon(Icons.agriculture_outlined,
-                size: 64, color: Palette.ink),
+                size: 48, color: Palette.ink),
             const SizedBox(height: 28),
             const Text('Peternakanmu,\npengalamanmu.',
                 style: TextStyle(
-                    fontSize: 38,
+                    fontSize: 32,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -1.2,
                     height: 1.1)),
@@ -54,7 +54,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                             children: [
                           Text(mode.farmer,
                               style: const TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.w700)),
+                                  fontSize: 18, fontWeight: FontWeight.w700)),
                           const SizedBox(height: 6),
                           Text(
                               mode == FarmMode.beef
@@ -80,6 +80,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             const SizedBox(height: 20),
             SubmitButton(
                 label: 'Sudah punya cadangan SAPIENS baru?',
+                secondary: true,
                 icon: Icons.restore,
                 submit: () => BackupActions.import(context, ref)),
           ]);

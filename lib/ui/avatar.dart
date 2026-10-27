@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
 import '../domain/cattle.dart';
+import 'cow_mark.dart';
 
 class CowAvatar extends StatelessWidget {
   const CowAvatar({super.key, required this.cattle, this.size = 58});
@@ -8,7 +9,7 @@ class CowAvatar extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) => ClipRRect(
-      borderRadius: BorderRadius.circular(size * .3),
+      borderRadius: BorderRadius.circular(size * .24),
       child: cattle.photos.isNotEmpty
           ? Image.memory(cattle.photos.last.bytes,
               width: size,
@@ -21,5 +22,5 @@ class CowAvatar extends StatelessWidget {
       height: size,
       color: Palette.leaf,
       alignment: Alignment.center,
-      child: Icon(Icons.pets_outlined, size: size * .45, color: Palette.ink));
+      child: CowMark(size: size * .52, color: Palette.ink));
 }

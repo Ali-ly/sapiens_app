@@ -73,11 +73,10 @@ class ConditionFieldsState extends State<ConditionFields> {
           child: DropdownButtonFormField<T>(
               value: value,
               isExpanded: true,
+              itemHeight: null,
               decoration: InputDecoration(labelText: label),
               items: values
-                  .map((v) => DropdownMenuItem(
-                      value: v,
-                      child: Text(text(v), overflow: TextOverflow.ellipsis)))
+                  .map((v) => DropdownMenuItem(value: v, child: Text(text(v))))
                   .toList(),
               onChanged: (v) {
                 setState(() => change(v));

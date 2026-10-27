@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/nutrition_context.dart';
 import '../../application/providers.dart';
@@ -19,6 +20,7 @@ class FeedPage extends ConsumerWidget {
       ..sort((a, b) =>
           b.evaluations.last.createdAt.compareTo(a.evaluations.last.createdAt));
     return PageFrame(
+        maxWidth: AppLayout.contentWidth,
         title: 'Pakan',
         back: false,
         subtitle:

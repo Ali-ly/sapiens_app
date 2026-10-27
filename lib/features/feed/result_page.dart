@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../app/theme.dart';
+import 'result_presentation.dart';
 
 import '../../domain/records.dart';
 import '../../domain/value.dart';
@@ -8,7 +11,7 @@ String backendLabel(String value) =>
     const {
       'below_predicted_intake': 'Di bawah perkiraan konsumsi layanan',
       'above_predicted_intake': 'Di atas perkiraan konsumsi layanan',
-      'ok': 'Tersedia',
+      'ok': 'Evaluasi selesai',
       'partial': 'Sebagian data tersedia',
       'insufficient_data': 'Data belum lengkap',
       'not_implemented': 'Belum didukung layanan',
@@ -195,108 +198,376 @@ class EvaluationResultPage extends StatelessWidget {
   final String cattleName;
   @override
   Widget build(BuildContext context) {
-    final j = evaluation.response;
-    final limited = evaluation.request['production_category'] == 'dairy' &&
-        containsLimited(j);
-    final status = j['status']?.toString();
-    final req = j['requirement'], supply = j['supply'] ?? j['feed_supply'];
+    final result = FeedResultPresentation(evaluation);
+    final cattle = resultMap(evaluation.request['cattle']);
+    final category = evaluation.request['production_category'];
+    final requirement = resultMap(evaluation.response['requirement']);
+    final warnings = result.warnings;
     return PageFrame(
         title: 'Hasil evaluasi pakan',
         subtitle: '$cattleName · ${dateText(evaluation.createdAt)}',
         children: [
-          Tag(status == null ? 'Hasil tersimpan' : backendLabel(status),
-              warning: limited || status != null && status != 'ok'),
-          const SizedBox(height: 16),
-          const Notice(
-              'Evaluasi ini disimpan sebagai histori dari input saat itu. Bukan ransum otomatis dan bukan keputusan pemberian pakan.'),
-          if (limited)
-            const Notice(
-                'Belum dapat dievaluasi penuh. Nutrien tidak diberi kesimpulan cukup/kurang ketika layanan belum dapat menilainya.',
-                warning: true),
-          if (j.containsKey('adequacy')) ...[
-            const Heading('Kebutuhan dibanding pasokan'),
-            Surface(child: BackendValue(j['adequacy'], limited: limited))
-          ],
-          if (req != null) ...[
-            const Heading('Kebutuhan nutrisi'),
-            Surface(
-                child: BackendValue(
-                    req is Map ? req['requirement_summary'] ?? req : req,
-                    limited: limited)),
-            if (req is Map)
-              ExpansionTile(
-                  title: const Text('Asumsi, sumber & keyakinan kebutuhan'),
-                  children: [
-                    BackendValue({
-                      for (final e in req.entries)
-                        if (e.key != 'requirement_summary') e.key: e.value
-                    }, limited: limited)
-                  ])
-          ],
-          if (supply != null) ...[
-            const Heading('Pasokan dari pakan'),
-            Surface(
-                child: BackendValue(
-                    supply is Map
-                        ? {
-                            for (final key in [
-                              'total_as_fed_kg_day',
-                              'total_dry_matter_kg_day',
-                              'nutrient_supply'
-                            ])
-                              if (supply.containsKey(key)) key: supply[key]
-                          }
-                        : supply,
-                    limited: limited)),
-            if (supply is Map)
-              ExpansionTile(
-                  title: const Text('Rincian dan cakupan pasokan'),
-                  children: [
-                    BackendValue({
-                      for (final e in supply.entries)
-                        if (![
-                          'total_as_fed_kg_day',
-                          'total_dry_matter_kg_day',
-                          'nutrient_supply'
-                        ].contains(e.key))
-                          e.key: e.value
-                    }, limited: limited)
-                  ])
-          ],
-          if (j.containsKey('warnings')) ...[
-            const Heading('Peringatan layanan'),
-            Surface(child: BackendValue(j['warnings'], limited: limited))
-          ],
-          if (j.containsKey('message'))
-            Notice(j['message'].toString(), warning: true),
-          for (final key in [
-            'assumptions',
-            'defaults_used',
-            'coverage',
-            'confidence',
-            'missing_fields',
-            'rule_version'
-          ])
-            if (j.containsKey(key))
-              Surface(
-                  padding: 8,
-                  child: ExpansionTile(
-                      title: Text(fieldLabel(key)),
-                      childrenPadding: const EdgeInsets.all(12),
-                      children: [BackendValue(j[key], limited: limited)])),
           Surface(
-              padding: 8,
-              child: ExpansionTile(
-                  title: const Text('Input bahan saat evaluasi'),
+              color: result.skippedCount == 0 &&
+                      result.available.isNotEmpty &&
+                      result.unavailable.isEmpty &&
+                      result.available.every((r) => r.sufficient)
+                  ? Palette.leaf
+                  : Palette.warningSurface,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final item
-                        in (evaluation.request['feed_items'] as List))
-                      ListTile(
-                          title: Text(
-                              evaluation.feedNames[(item as Map)['feed_id']] ??
-                                  'Bahan pakan'),
-                          subtitle: Text('${item['as_fed_kg_day']} kg/hari'))
+                    Text(result.headline,
+                        style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 10),
+                    Text(result.summary),
+                    if (result.deficientCount > 0 ||
+                        result.unavailable.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                          result.skippedCount > 0
+                              ? 'Lihat daftar pakan di bawah untuk bahan yang belum dihitung dan alasannya.'
+                              : 'Periksa apakah semua bahan dan jumlah pakan harian sudah dimasukkan.',
+                          style: const TextStyle(fontWeight: FontWeight.w600))
+                    ]
                   ])),
+          Wrap(spacing: 16, runSpacing: 6, children: [
+            if (category == 'beef' || category == 'dairy')
+              Text(category == 'beef' ? 'Sapi Potong' : 'Sapi Perah'),
+            if (resultNumber(cattle['body_weight_kg']) != null)
+              Text(
+                  'Bobot saat evaluasi: ${number(resultNumber(cattle['body_weight_kg'])!)} kg'),
+          ]),
+          const Heading('Perbandingan per hari'),
+          const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Text(
+                  'Kebutuhan dihitung untuk sapi ini. Dari pakan adalah kontribusi bahan yang berhasil dihitung oleh layanan.',
+                  style: TextStyle(color: Palette.muted))),
+          if (result.available.isNotEmpty)
+            Surface(
+                padding: 16,
+                child: Column(children: [
+                  for (var i = 0; i < result.available.length; i++) ...[
+                    if (i > 0) const Divider(height: 32),
+                    _ComparisonRow(result.available[i])
+                  ]
+                ])),
+          if (result.unavailable.isNotEmpty)
+            Surface(
+                padding: 4,
+                child: ExpansionTile(
+                    initiallyExpanded: result.available.isEmpty,
+                    title: Text(
+                        '${result.unavailable.length} komponen belum dapat dinilai'),
+                    subtitle: const Text(
+                        'Data belum lengkap, bukan berarti kandungannya nol.'),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      for (var i = 0; i < result.unavailable.length; i++) ...[
+                        if (i > 0) const Divider(),
+                        _UnavailableRow(result.unavailable[i])
+                      ]
+                    ])),
+          if (result.comparisons.isEmpty)
+            const Notice(
+                'Belum ada hasil perbandingan dari layanan. Tidak ada status cukup atau kurang yang dibuat oleh aplikasi.',
+                warning: true),
+          const Heading('Pakan yang dimasukkan'),
+          const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                  'Jumlah di bawah adalah berat pakan segar per hari, termasuk kandungan airnya.',
+                  style: TextStyle(color: Palette.muted))),
+          Surface(
+              padding: 16,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < result.feedInputs.length; i++) ...[
+                      if (i > 0) const Divider(),
+                      _FeedInput(result, result.feedInputs[i])
+                    ],
+                    if (result.feedInputs.isEmpty)
+                      const Text(
+                          'Daftar bahan tidak tersedia pada snapshot ini.')
+                  ])),
+          if (warnings.isNotEmpty) ...[
+            const Heading('Catatan yang memengaruhi hasil'),
+            for (final warning in warnings) Notice(warning, warning: true)
+          ],
+          const Heading('Rincian perhitungan'),
+          if (requirement['requirement_summary'] != null)
+            _DetailSection(
+                title: 'Rincian kebutuhan sapi',
+                subtitle:
+                    'Angka kebutuhan dari layanan, termasuk yang belum bisa dibandingkan.',
+                child: _RequirementDetails(
+                    resultMap(requirement['requirement_summary']))),
+          if (requirement.containsKey('assumptions') ||
+              evaluation.response.containsKey('assumptions') ||
+              evaluation.response.containsKey('defaults_used'))
+            _DetailSection(
+                title: 'Asumsi dan nilai referensi',
+                subtitle: 'Data yang digunakan saat input belum tersedia.',
+                child: BackendValue({
+                  if (requirement.containsKey('assumptions'))
+                    'assumptions': requirement['assumptions'],
+                  for (final key in ['assumptions', 'defaults_used'])
+                    if (evaluation.response.containsKey(key))
+                      key: evaluation.response[key],
+                }, limited: result.dairyLimited)),
+          if (evaluation.response.containsKey('coverage') ||
+              evaluation.response.containsKey('confidence') ||
+              requirement.containsKey('confidence'))
+            _DetailSection(
+                title: 'Kelengkapan data dan keyakinan layanan',
+                subtitle:
+                    'Kelengkapan profil nutrisi berbeda dari persentase kebutuhan yang dipenuhi.',
+                child: _CoverageDetails(evaluation.response, requirement)),
+          _DetailSection(
+              title: 'Data teknis backend',
+              subtitle: 'Respons asli untuk pemeriksaan developer.',
+              child: SelectableText(
+                  const JsonEncoder.withIndent('  ')
+                      .convert(evaluation.response),
+                  style: const TextStyle(fontSize: 12, height: 1.5))),
+          const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                  'Disimpan sebagai histori evaluasi. Hasil ini tidak mengubah jumlah pemberian pakan secara otomatis.',
+                  style: TextStyle(fontSize: 12, color: Palette.muted))),
         ]);
+  }
+}
+
+class _ComparisonRow extends StatelessWidget {
+  const _ComparisonRow(this.row);
+  final NutrientComparison row;
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Text(row.title, style: Theme.of(context).textTheme.titleMedium),
+              Tag(row.statusLabel,
+                  warning: row.deficient || row.excess || row.intake)
+            ]),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (context, c) {
+          final supply = _Amount(
+              label: 'Dari pakan', value: row.supply!, unit: row.displayUnit!);
+          final needed = _Amount(
+              label: row.intake ? 'Perkiraan konsumsi' : 'Kebutuhan',
+              value: row.requirement!,
+              unit: row.displayUnit!);
+          return c.maxWidth < 270 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 20
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [supply, const SizedBox(height: 12), needed])
+              : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: supply),
+                  const SizedBox(width: 16),
+                  Expanded(child: needed)
+                ]);
+        }),
+        if (row.percentage != null) ...[
+          const SizedBox(height: 14),
+          Text(
+              '${number(row.percentage!, digits: 2)}% dari ${row.intake ? 'perkiraan konsumsi' : 'kebutuhan terhitung'}',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ExcludeSemantics(
+              child: LinearProgressIndicator(
+                  value: (row.percentage! / 100).clamp(0, 1),
+                  minHeight: 5,
+                  color: row.deficient || row.excess || row.intake
+                      ? Palette.amber
+                      : Palette.ink,
+                  backgroundColor: Palette.line)),
+        ],
+        if (row.key == 'dry_matter')
+          const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Text(
+                  'Bahan kering adalah bagian pakan tanpa air. Angka ini berbeda dari berat pakan segar yang dimasukkan.',
+                  style: TextStyle(color: Palette.muted, fontSize: 12))),
+        if (row.key == 'tdn')
+          const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Text(
+                  'TDN adalah indikator energi yang dipakai layanan. Angka ditampilkan dalam kg TDN per hari.',
+                  style: TextStyle(color: Palette.muted, fontSize: 12))),
+        if (row.intake)
+          const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Text(
+                  'Ini perbandingan konsumsi bahan kering, belum menjadi kesimpulan kecukupan seluruh nutrien.',
+                  style: TextStyle(color: Palette.muted, fontSize: 12))),
+      ]);
+}
+
+class _Amount extends StatelessWidget {
+  const _Amount({required this.label, required this.value, required this.unit});
+  final String label, unit;
+  final double value;
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(color: Palette.muted, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text.rich(
+            TextSpan(children: [
+              TextSpan(text: number(value, digits: 2)),
+              TextSpan(
+                  text: ' $unit',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Palette.muted)),
+            ]),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+      ]);
+}
+
+class _UnavailableRow extends StatelessWidget {
+  const _UnavailableRow(this.row);
+  final NutrientComparison row;
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(row.title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 6),
+        Text(row.explanation),
+        if (row.requirement != null && row.unit != null)
+          Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                  'Kebutuhan dari layanan: ${number(row.requirement!, digits: 2)} ${row.unit}')),
+      ]);
+}
+
+class _FeedInput extends StatelessWidget {
+  const _FeedInput(this.result, this.input);
+  final FeedResultPresentation result;
+  final Map<String, dynamic> input;
+  @override
+  Widget build(BuildContext context) {
+    final id = input['feed_id']?.toString() ?? '';
+    final rows = result.supplyItems.where((r) => r['feed_id'] == id);
+    final item = rows.isEmpty ? const <String, dynamic>{} : rows.first;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(result.feedName(id), style: Theme.of(context).textTheme.titleMedium),
+      if (resultNumber(input['as_fed_kg_day']) != null)
+        Text(
+            '${number(resultNumber(input['as_fed_kg_day'])!, digits: 2)} kg/hari'),
+      if (item['supply_evaluable'] == false)
+        const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Tag('Belum ikut dihitung', warning: true)),
+    ]);
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  const _DetailSection(
+      {required this.title, required this.subtitle, required this.child});
+  final String title, subtitle;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Surface(
+      padding: 4,
+      child: ExpansionTile(
+          title: Text(title),
+          subtitle: Text(subtitle),
+          childrenPadding: const EdgeInsets.all(16),
+          children: [child]));
+}
+
+class _RequirementDetails extends StatelessWidget {
+  const _RequirementDetails(this.data);
+  final Map<String, dynamic> data;
+  static const fields = {
+    'dry_matter_kg_day': ('Bahan kering', 'kg/hari'),
+    'predicted_dmi_kg_day': ('Perkiraan konsumsi bahan kering', 'kg/hari'),
+    'tdn_kg_day': ('Energi (TDN)', 'kg/hari'),
+    'crude_protein_g_day': ('Protein kasar', 'g/hari'),
+    'calcium_g_day': ('Kalsium', 'g/hari'),
+    'phosphorus_g_day': ('Fosfor', 'g/hari'),
+    'metabolizable_energy_mcal_day': ('Energi metabolisme', 'Mcal/hari'),
+    'energy_total_mcal_day': ('Total energi netto (NEL)', 'Mcal/hari'),
+    'nel_maintenance_mcal_day': ('Energi pemeliharaan (NEL)', 'Mcal/hari'),
+    'nel_milk_mcal_day': ('Energi produksi susu (NEL)', 'Mcal/hari'),
+  };
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (final entry in fields.entries)
+          if (resultNumber(data[entry.key]) != null)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                    '${entry.value.$1}: ${number(resultNumber(data[entry.key])!, digits: 2)} ${entry.value.$2}')),
+        const Text(
+            'Sumber dan metode perhitungan tersedia pada data teknis backend.',
+            style: TextStyle(color: Palette.muted, fontSize: 12)),
+      ]);
+}
+
+class _CoverageDetails extends StatelessWidget {
+  const _CoverageDetails(this.response, this.requirement);
+  final Map<String, dynamic> response, requirement;
+  static const labels = {
+    'dry_matter': 'Bahan kering',
+    'dmi': 'Konsumsi bahan kering',
+    'energy': 'Energi',
+    'protein': 'Protein',
+    'calcium': 'Kalsium',
+    'phosphorus': 'Fosfor',
+    'tdn_fraction': 'Profil energi (TDN)',
+    'crude_protein_fraction': 'Profil protein kasar',
+    'calcium_fraction': 'Profil kalsium',
+    'phosphorus_fraction': 'Profil fosfor',
+  };
+  @override
+  Widget build(BuildContext context) {
+    final coverage = resultMap(response['coverage']);
+    final supply = resultMap(response['supply'] ?? response['feed_supply']);
+    final groups = {
+      'Data kebutuhan sapi':
+          resultMap(coverage['requirement'] ?? requirement['coverage']),
+      'Data nutrisi pakan':
+          resultMap(coverage['feed_supply'] ?? supply['coverage']),
+    };
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (requirement['confidence'] != null)
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+                'Keyakinan perhitungan kebutuhan: ${backendLabel(requirement['confidence'].toString())}')),
+      if (response['confidence'] != null) ...[
+        const Text('Keyakinan hasil dari layanan'),
+        BackendValue(response['confidence']),
+        const SizedBox(height: 12)
+      ],
+      for (final group in groups.entries)
+        if (group.value.isNotEmpty) ...[
+          Text(group.key, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          for (final field in group.value.entries)
+            if (labels.containsKey(field.key))
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                      '${labels[field.key]}: ${field.key.endsWith('_fraction') && resultNumber(field.value) != null && resultNumber(field.value)! <= 1 ? '${number(resultNumber(field.value)! * 100, digits: 0)}% cakupan data' : backendLabel(field.value.toString())}')),
+          const SizedBox(height: 12),
+        ],
+      const Text('Cakupan data bukan persentase kecukupan pakan.',
+          style: TextStyle(color: Palette.muted, fontSize: 12))
+    ]);
   }
 }

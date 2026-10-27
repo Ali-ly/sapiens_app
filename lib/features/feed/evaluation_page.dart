@@ -99,10 +99,9 @@ class _FeedEvaluationPageState extends ConsumerState<FeedEvaluationPage> {
                     onChanged: (v) => setState(() => query = v)),
                 const SizedBox(height: 14),
                 catalog.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
+                    loading: () => const LoadingState(),
                     error: (e, _) => Column(children: [
-                          Notice(errorText(e), warning: true),
+                          Notice(errorText(e), error: true),
                           OutlinedButton(
                               onPressed: () =>
                                   ref.invalidate(feedCatalogProvider(mode)),

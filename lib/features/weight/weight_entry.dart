@@ -184,6 +184,6 @@ class _WeightEntryState extends ConsumerState<WeightEntry> {
                 ]))
           ],
         ],
-        if (error != null) Notice(error!, warning: true),
+        if (error != null) Notice(error!, error: true),
       ]);
 }

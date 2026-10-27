@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/providers.dart';
 import '../../domain/condition.dart';
@@ -37,6 +38,7 @@ class _CattlePageState extends ConsumerState<CattlePage> {
                     (c.condition as DairyCondition).stage == stage)))
         .toList();
     return PageFrame(
+        maxWidth: AppLayout.contentWidth,
         title: 'Ternak',
         back: false,
         subtitle: '${mode.label} · ${data.active.length} sapi aktif',

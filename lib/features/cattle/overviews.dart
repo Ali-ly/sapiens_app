@@ -34,6 +34,7 @@ class BeefOverview extends StatelessWidget {
             onTap: () => go(ProfileSection.weight)),
         Metric(
             label: 'Pemeliharaan',
+            textValue: true,
             value: c.purpose.label,
             detail: c.phase?.label ?? c.pregnancy?.label,
             onTap: () => go(ProfileSection.care))
@@ -106,12 +107,11 @@ class DairyOverview extends StatelessWidget {
             onTap: () => go(ProfileSection.milk)),
         Metric(
             label: 'Fase fisiologis',
+            textValue: true,
             value: c.stage?.label ?? 'Belum dipilih',
             detail:
                 m.dim == null ? 'DIM belum diketahui.' : 'DIM ${m.dim} hari',
-            onTap: () => go(ProfileSection.care))
-      ]),
-      MetricGrid(children: [
+            onTap: () => go(ProfileSection.care)),
         Metric(
             label: 'Bobot terbaru',
             value: '${number(cattle.latestWeight.kg)} kg',

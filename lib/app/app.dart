@@ -9,6 +9,7 @@ import '../features/onboarding/onboarding_page.dart';
 import '../features/settings/backup_actions.dart';
 import '../features/settings/settings_page.dart';
 import '../ui/components.dart';
+import '../ui/cow_mark.dart';
 import 'theme.dart';
 
 class SapiensApp extends StatelessWidget {
@@ -27,11 +28,10 @@ class AccountGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => ref
       .watch(farmProvider)
       .when(
-        loading: () =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        loading: () => const Scaffold(body: LoadingState()),
         error: (e, _) =>
             PageFrame(title: 'Data belum dapat dibuka', back: false, children: [
-          Notice(errorText(e), warning: true),
+          Notice(errorText(e), error: true),
           const Text(
               'Data yang tersimpan tidak ditimpa. Coba muat ulang atau pulihkan cadangan yang valid.'),
           const SizedBox(height: 20),
@@ -66,25 +66,28 @@ class _MainShellState extends State<MainShell> {
         FeedPage(),
         SettingsPage()
       ]),
-      bottomNavigationBar: NavigationBar(
-          selectedIndex: selected,
-          onDestinationSelected: (i) => setState(() => selected = i),
-          destinations: const [
-            NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Beranda'),
-            NavigationDestination(
-                icon: Icon(Icons.pets_outlined),
-                selectedIcon: Icon(Icons.pets),
-                label: 'Ternak'),
-            NavigationDestination(
-                icon: Icon(Icons.grass_outlined),
-                selectedIcon: Icon(Icons.grass),
-                label: 'Pakan'),
-            NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profil')
-          ]));
+      bottomNavigationBar: DecoratedBox(
+          decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Palette.line))),
+          child: NavigationBar(
+              selectedIndex: selected,
+              onDestinationSelected: (i) => setState(() => selected = i),
+              destinations: const [
+                NavigationDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home),
+                    label: 'Beranda'),
+                NavigationDestination(
+                    icon: CowMark(),
+                    selectedIcon: CowMark(color: Palette.ink),
+                    label: 'Ternak'),
+                NavigationDestination(
+                    icon: Icon(Icons.grass_outlined),
+                    selectedIcon: Icon(Icons.grass),
+                    label: 'Pakan'),
+                NavigationDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: 'Profil')
+              ])));
 }

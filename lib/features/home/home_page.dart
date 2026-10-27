@@ -139,6 +139,7 @@ class HomePage extends ConsumerWidget {
     }
     activity.sort((a, b) => b.at.compareTo(a.at));
     return PageFrame(
+        maxWidth: AppLayout.contentWidth,
         title: 'Beranda',
         back: false,
         subtitle: '${a.farmName} · ${dateText(now)}',
@@ -148,24 +149,23 @@ class HomePage extends ConsumerWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(a.mode.farmer.toUpperCase(),
-                        style: const TextStyle(
-                            color: Palette.leaf,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5)),
-                    const SizedBox(height: 16),
                     Text(
                         a.owner == 'Peternak'
                             ? 'Selamat datang\ndi SAPIENS.'
                             : 'Halo, ${a.owner}.',
                         style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 32,
+                            fontSize: 28,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -.8,
                             height: 1.15)),
                     const SizedBox(height: 16),
+                    Text(a.mode.farmer,
+                        style: const TextStyle(
+                            color: Palette.leaf,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
                     Text(
                         '${active.length} sapi aktif · catatan milik peternakanmu',
                         style: const TextStyle(color: Color(0xFFC5DACF)))
