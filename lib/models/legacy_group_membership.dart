@@ -1,3 +1,5 @@
+import 'persisted_time.dart';
+
 /// Read-only compatibility data from schema 3; not operational membership.
 class LegacyGroupMembership {
   const LegacyGroupMembership(
@@ -5,8 +7,11 @@ class LegacyGroupMembership {
       required this.cattleId,
       required this.groupId,
       required this.joinedAt,
-      this.leftAt});
+      this.joinedAtText,
+      this.leftAt,
+      this.leftAtText});
   final String id, cattleId, groupId;
+  final String? joinedAtText, leftAtText;
   final DateTime joinedAt;
   final DateTime? leftAt;
   bool get active => leftAt == null;
@@ -14,16 +19,18 @@ class LegacyGroupMembership {
         'id': id,
         'cattleId': cattleId,
         'groupId': groupId,
-        'joinedAt': joinedAt.toIso8601String(),
-        'leftAt': leftAt?.toIso8601String()
+        'joinedAt': PersistedTime.encode(joinedAt, joinedAtText),
+        'leftAt': PersistedTime.optional(leftAt, leftAtText)
       };
   factory LegacyGroupMembership.fromJson(Map<String, dynamic> json) =>
       LegacyGroupMembership(
           id: json['id'] as String,
           cattleId: json['cattleId'] as String,
           groupId: json['groupId'] as String,
-          joinedAt: DateTime.parse(json['joinedAt'] as String).toUtc(),
+          joinedAtText: json['joinedAt'] as String,
+          joinedAt: PersistedTime.parse(json['joinedAt'] as String),
+          leftAtText: json['leftAt'] as String?,
           leftAt: json['leftAt'] == null
               ? null
-              : DateTime.parse(json['leftAt'] as String).toUtc());
+              : PersistedTime.parse(json['leftAt'] as String));
 }

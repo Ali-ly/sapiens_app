@@ -5,8 +5,8 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/cattle.dart';
 import '../../../models/feed_plan.dart';
 import '../../../widgets/farm_ui.dart';
-import '../../feed/feed_calculator_screen.dart';
 import '../../feed/feed_result_screen.dart';
+import '../../feed/individual_feed_entry_screen.dart';
 
 class CattleFeedPanel extends StatelessWidget {
   const CattleFeedPanel(
@@ -52,10 +52,12 @@ class CattleFeedPanel extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       plan == null
-                          ? 'Hitung kebutuhan sesuai targetmu.'
+                          ? 'Evaluasi bahan memakai konteks sapi.'
                           : active
                               ? 'Rencana terkini siap digunakan.'
-                              : 'Perbarui rencana dengan data terbaru.',
+                              : !cattle.isActive
+                                  ? 'Rencana tersimpan untuk ternak nonaktif.'
+                                  : 'Perbarui rencana dengan data terbaru.',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
@@ -72,15 +74,15 @@ class CattleFeedPanel extends StatelessWidget {
             style: FilledButton.styleFrom(
                 disabledBackgroundColor: AppColors.divider,
                 disabledForegroundColor: AppColors.textSecondary),
-            onPressed: cattle.estimatedWeight == null
+            onPressed: !cattle.isActive || cattle.estimatedWeight == null
                 ? null
                 : () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(
                         builder: (_) =>
-                            FeedCalculatorScreen(cattleId: cattle.id))),
+                            IndividualFeedEntryScreen(cattleId: cattle.id))),
             icon: Icon(
-                cattle.estimatedWeight == null
+                !cattle.isActive || cattle.estimatedWeight == null
                     ? CupertinoIcons.lock
                     : CupertinoIcons.arrow_right,
                 size: 18),

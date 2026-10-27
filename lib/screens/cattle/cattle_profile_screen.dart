@@ -5,11 +5,15 @@ import '../../core/constants/app_colors.dart';
 import '../../models/cattle.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../../widgets/livestock_labels.dart';
 import '../../widgets/photo_preview.dart';
+import '../beef/beef_module_screen.dart';
+import '../dairy/dairy_module_screen.dart';
 import '../feed/feed_result_screen.dart';
 import 'add_cattle_screen.dart';
 import 'cattle_photo_screen.dart';
 import 'widgets/cattle_feed_panel.dart';
+import 'widgets/shared_twin_panel.dart';
 import 'widgets/weight_chart.dart';
 import 'widgets/weight_entry_dialog.dart';
 
@@ -68,9 +72,9 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
     final yes = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Hapus sapi ini?'),
+        title: const Text('Arsipkan sapi ini?'),
         content: Text(
-          'Profil ${c.nameOrId}, riwayat bobot, foto, dan rencana pakannya akan dihapus dari perangkat ini.',
+          '${c.nameOrId} akan dikeluarkan dari daftar aktif. Profil, foto, bobot, dan rencana pakan tetap tersimpan di Arsip.',
         ),
         actions: [
           CupertinoDialogAction(
@@ -80,7 +84,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus'),
+            child: const Text('Arsipkan'),
           )
         ],
       ),
@@ -104,7 +108,14 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
         animation: FarmScope.read(context),
         builder: (context, _) {
           final store = FarmScope.read(context);
-          final c = store.byId(widget.cattle.id) ?? widget.cattle;
+          final c = store.byId(widget.cattle.id);
+          if (c == null) {
+            return const FarmPage(
+                title: 'Profil tidak tersedia',
+                subtitle: 'Kembali ke daftar ternak.',
+                back: true,
+                children: []);
+          }
           final plan = store.latestPlan(c.id);
           final active = store.planReady(c);
           final history = store.feedPlans
@@ -116,17 +127,25 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
               : c.history.last.weightKg - c.history.first.weightKg;
           return FarmPage(
             title: c.nameOrId,
-            subtitle: 'Setiap catatan membantu menentukan pakan berikutnya.',
+            subtitle: c.isActive
+                ? (c.productionCategory == ProductionCategory.beef
+                    ? 'Sapi Pedaging · pertumbuhan, pakan, dan pembibitan.'
+                    : c.productionCategory == ProductionCategory.dairy
+                        ? 'Sapi Perah · susu, laktasi, dan reproduksi.'
+                        : 'Profil lama belum diklasifikasi.')
+                : 'Status: ${c.status.label}. Seluruh catatan tetap tersimpan.',
             eyebrow: 'PROFIL TERNAK',
             back: true,
             action: IconButton(
               tooltip: 'Edit profil sapi',
               style: IconButton.styleFrom(backgroundColor: Colors.white),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                    builder: (_) => AddCattleScreen(cattle: c)),
-              ),
+              onPressed: !c.isActive
+                  ? null
+                  : () => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                            builder: (_) => AddCattleScreen(cattle: c)),
+                      ),
               icon: const Icon(CupertinoIcons.pencil, size: 20),
             ),
             children: [
@@ -140,17 +159,25 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${c.gender} · ${c.ageMonths} bulan',
+                            '${c.gender} · ${ageEvidenceLabel(c)}',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                              '${productionLabel(c.productionCategory)} · ${c.status.label}',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary)),
                           const SizedBox(height: 11),
                           StatusPill(
-                            store.needsCheck(c)
-                                ? 'Waktunya cek bobot'
-                                : 'Bobot terkini',
+                            !c.isActive
+                                ? c.status.label
+                                : store.needsCheck(c)
+                                    ? 'Waktunya cek bobot'
+                                    : 'Bobot terkini',
                             warning: store.needsCheck(c),
                           )
                         ],
@@ -189,7 +216,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                     Text(
                       c.history.isEmpty
                           ? 'Catat bobot pertama untuk menghitung pakan.'
-                          : '${dateLabel(c.history.last.date)} · ${c.history.last.sourceLabel}',
+                          : '${timestampLabel(c.history.last.date, c.history.last.dateText)} · ${c.history.last.sourceLabel}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFFBBC9B7),
@@ -208,13 +235,13 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: () => photo(context, c),
+                onPressed: c.isActive ? () => photo(context, c) : null,
                 icon: const Icon(CupertinoIcons.camera, size: 20),
                 label: const Text('Estimasi bobot dari foto'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => manual(context, c),
+                onPressed: c.isActive ? () => manual(context, c) : null,
                 icon: const Icon(CupertinoIcons.gauge, size: 20),
                 label: const Text('Catat bobot manual'),
               ),
@@ -243,6 +270,10 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                 },
               ),
               if (section == 0) ...[
+                if (c.productionCategory == ProductionCategory.beef)
+                  BeefProfilePanel(cattle: c),
+                if (c.productionCategory == ProductionCategory.dairy)
+                  DairyProfilePanel(cattle: c),
                 const SectionHeading('Perkembangan bobot'),
                 if (c.history.length < 2)
                   const Panel(
@@ -300,6 +331,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                     style: const TextStyle(fontSize: 13, height: 1.7),
                   ),
                 ),
+                SharedTwinPanel(cattle: c),
                 if (c.images.isNotEmpty) ...[
                   const SectionHeading('Galeri foto'),
                   SizedBox(
@@ -358,7 +390,7 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    dateLabel(r.date),
+                                    timestampLabel(r.date, r.dateText),
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
@@ -435,9 +467,30 @@ class _CattleProfileScreenState extends State<CattleProfileScreen> {
               const SizedBox(height: 26),
               TextButton.icon(
                 style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                onPressed: () => remove(context, c),
-                icon: const Icon(CupertinoIcons.trash, size: 17),
-                label: const Text('Hapus sapi'),
+                onPressed: c.isActive
+                    ? () => remove(context, c)
+                    : c.status == CattleStatus.archived
+                        ? () async {
+                            try {
+                              await store.setCattleStatus(
+                                  c.id, CattleStatus.active,
+                                  note: 'Pulihkan dari arsip',
+                                  expectedEventCount: c.core.timeline.length);
+                            } catch (e) {
+                              if (context.mounted) showError(context, e);
+                            }
+                          }
+                        : null,
+                icon: Icon(
+                    c.isActive
+                        ? CupertinoIcons.archivebox
+                        : CupertinoIcons.arrow_counterclockwise,
+                    size: 17),
+                label: Text(c.isActive
+                    ? 'Arsipkan sapi'
+                    : c.status == CattleStatus.archived
+                        ? 'Pulihkan dari arsip'
+                        : c.status.label),
               ),
             ],
           );

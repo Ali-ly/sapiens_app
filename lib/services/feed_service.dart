@@ -4,39 +4,69 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/constants/api_constants.dart';
-import '../models/cattle.dart';
-import '../models/feed_plan.dart';
+import '../models/feed_api_v2.dart';
+import '../models/production.dart';
 import 'api_response.dart';
-import 'feed_response_mapper.dart';
 
 class FeedService {
-  static Future<FeedPlan> calculatePlan(
-      {required Cattle cattle,
-      required String target,
-      required String condition,
-      required List<String> availableFeeds,
-      http.Client? client}) async {
-    final weight = cattle.estimatedWeight;
-    if (weight == null) {
-      throw const FormatException(
-        'Catat bobot sapi terlebih dahulu untuk menghitung pakan.',
-      );
+  /// v2 catalog: stable backend feed IDs, independent of legacy UI labels.
+  static Future<FeedCatalogResponse> fetchFeeds({
+    required ProductionCategory productionCategory,
+    http.Client? client,
+  }) async {
+    final data =
+        await _v2('/v2/feeds/${productionCategory.name}', client: client);
+    final catalog = FeedCatalogResponse.fromJson(data);
+    if (catalog.productionCategory != productionCategory) {
+      throw const FormatException('Kategori katalog tidak sesuai permintaan.');
     }
-    final response = await calculateFeed(
-      weight: weight,
-      target: target,
-      availableFeeds: availableFeeds,
-      client: client,
-    );
-    return FeedResponseMapper.parse(
-      cattle: cattle,
-      target: target,
-      condition: condition,
-      feeds: availableFeeds,
-      data: response,
-    );
+    return catalog;
   }
 
+  /// Evaluates user-supplied quantities; does not create a FeedPlan/ration.
+  static Future<NutritionResponse> calculateNutrition({
+    required NutritionRequest request,
+    http.Client? client,
+  }) async {
+    final data =
+        await _v2('/v2/nutrition', body: request.toJson(), client: client);
+    final result = NutritionResponse.fromJson(data);
+    if (result.productionCategory != null &&
+        result.productionCategory != request.productionCategory) {
+      throw const FormatException('Kategori hasil nutrisi tidak sesuai input.');
+    }
+    return result;
+  }
+
+  static Future<Map<String, dynamic>> _v2(String path,
+      {Map<String, dynamic>? body, http.Client? client}) async {
+    final connection = client ?? http.Client();
+    final base = ApiConstants.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    try {
+      final uri = Uri.parse('$base$path');
+      final response = await (body == null
+              ? connection.get(uri, headers: headers)
+              : connection.post(uri, headers: headers, body: jsonEncode(body)))
+          .timeout(const Duration(seconds: 30));
+      return ApiResponse.decode(response,
+          invalidResponseMessage: 'Respons API pakan v2 tidak dapat dibaca.',
+          rejectedResponseMessage: 'Permintaan API pakan v2 ditolak.');
+    } on TimeoutException {
+      throw const ApiException('Layanan pakan v2 terlalu lama merespons.');
+    } on http.ClientException {
+      throw const ApiException('Tidak dapat menghubungi layanan pakan v2.');
+    } finally {
+      if (client == null) connection.close();
+    }
+  }
+
+  /// Compatibility transport still required by GroupFeedService.
+  /// Individual evaluations use calculateNutrition; never route them here.
   static Future<Map<String, dynamic>> calculateFeed(
       {required double weight,
       required String target,

@@ -20,6 +20,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Check migration fixture bundle
+        run: python3 tool/generate_migration_fixtures.py --check
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
       - name: Analyze
@@ -33,5 +35,12 @@ jobs:
           test/command_center_test.dart
           test/groups_ui_test.dart
           test/photo_preview_test.dart
+          test/twin_foundation_test.dart
+          test/schema_migration_test.dart
+          test/shared_core_ui_test.dart
+          test/beef_module_test.dart
+          test/beef_ui_test.dart
+          test/dairy_module_test.dart
+          test/dairy_ui_test.dart
       - name: Build web
         run: flutter build web --release

@@ -17,7 +17,8 @@ class WeightService {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConstants.baseUrl}/predict-weight'),
+        Uri.parse(
+            '${ApiConstants.baseUrl.replaceFirst(RegExp(r'/+$'), '')}/v2/weight'),
       );
       request.headers.addAll(
         {'Accept': 'application/json', 'ngrok-skip-browser-warning': 'true'},
@@ -27,7 +28,7 @@ class WeightService {
           http.MultipartFile.fromBytes(
             'files',
             image.bytes,
-            filename: image.file.name,
+            filename: image.name,
           ),
         );
       }

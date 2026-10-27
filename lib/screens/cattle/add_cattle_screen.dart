@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../../models/cattle.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../../widgets/livestock_labels.dart';
 import '../../widgets/unsaved_changes_guard.dart';
 import 'cattle_profile_screen.dart';
 
 class AddCattleScreen extends StatefulWidget {
-  const AddCattleScreen({super.key, this.cattle});
+  const AddCattleScreen({super.key, this.cattle, this.initialCategory});
   final Cattle? cattle;
+  final ProductionCategory? initialCategory;
   @override
   State<AddCattleScreen> createState() => _AddCattleScreenState();
 }
@@ -18,7 +20,14 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
   late final TextEditingController name, age, notes;
   final weight = TextEditingController();
   late String gender;
+  late String farmRevision;
+  ProductionCategory? category;
   bool busy = false, dirty = false;
+  bool get canEditAge =>
+      widget.cattle == null ||
+      (widget.cattle!.core.identity.ageEvidence.certainty ==
+              AgeCertainty.estimated &&
+          widget.cattle!.core.identity.ageEvidence.birthDate == null);
   @override
   void initState() {
     super.initState();
@@ -27,6 +36,13 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
     age = TextEditingController(text: c?.ageMonths.toString());
     notes = TextEditingController(text: c?.notes);
     gender = c?.gender ?? 'Jantan';
+    final systems = FarmScope.read(context).productionSystems;
+    if (c == null &&
+        widget.initialCategory != null &&
+        systems?.allows(widget.initialCategory!) == true) {
+      category = widget.initialCategory;
+    }
+    farmRevision = FarmScope.read(context).settingsRevision;
   }
 
   @override
@@ -51,11 +67,13 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
               old.id,
               name: name.text,
               gender: gender,
-              ageMonths: int.parse(age.text.trim()),
+              ageMonths:
+                  canEditAge ? int.parse(age.text.trim()) : old.ageMonths,
               notes: notes.text,
             )
           : await store.saveCattle(
               Cattle(
+                productionCategory: category,
                 nameOrId: name.text.trim(),
                 gender: gender,
                 ageMonths: int.parse(age.text.trim()),
@@ -66,11 +84,12 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                     : [
                         WeightRecord(
                           weightKg: kg,
-                          date: DateTime.now(),
+                          date: store.currentTime.toUtc(),
                           source: 'manual',
                         )
                       ],
               ),
+              expectedFarmSettingsRevision: farmRevision,
             );
       if (!mounted) {
         return;
@@ -113,7 +132,13 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
         busy: busy,
         child: FarmPage(
           title: widget.cattle == null ? 'Tambah sapi' : 'Edit profil sapi',
-          subtitle: 'Identitas yang rapi, pemantauan lebih mudah.',
+          subtitle: FarmScope.read(context).productionSystems?.singleCategory ==
+                  ProductionCategory.beef
+              ? 'Peternakan Sapi Pedaging · identitas ternak baru.'
+              : FarmScope.read(context).productionSystems?.singleCategory ==
+                      ProductionCategory.dairy
+                  ? 'Peternakan Sapi Perah · identitas ternak baru.'
+                  : 'Identitas yang rapi, pemantauan lebih mudah.',
           back: true,
           children: [
             Panel(
@@ -139,6 +164,7 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                       ),
                       const SizedBox(height: 18),
                       TextFormField(
+                        key: const ValueKey('cattle-name'),
                         controller: name,
                         textCapitalization: TextCapitalization.words,
                         maxLength: 60,
@@ -151,21 +177,56 @@ class _AddCattleScreenState extends State<AddCattleScreen> {
                             ? 'Nama / ID sapi wajib diisi.'
                             : null,
                       ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: age,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Umur (bulan)',
-                          prefixIcon: Icon(Icons.calendar_month_outlined),
+                      if (widget.cattle == null &&
+                          FarmScope.read(context).productionSystems ==
+                              FarmProductionSystems.both) ...[
+                        const SizedBox(height: 14),
+                        DropdownButtonFormField<ProductionCategory>(
+                          value: category,
+                          decoration: const InputDecoration(
+                              labelText: 'Kategori produksi'),
+                          items: ProductionCategory.values
+                              .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c == ProductionCategory.beef
+                                      ? 'Beef'
+                                      : 'Dairy')))
+                              .toList(),
+                          onChanged: (value) => setState(() {
+                            category = value;
+                            dirty = true;
+                          }),
+                          validator: (v) =>
+                              v == null ? 'Pilih kategori produksi.' : null,
                         ),
-                        validator: (v) {
-                          final n = int.tryParse(v ?? '');
-                          return n == null || n < 1 || n > 360
-                              ? 'Masukkan umur 1–360 bulan.'
-                              : null;
-                        },
-                      ),
+                      ],
+                      if (widget.cattle == null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                            'Kategori: ${FarmScope.read(context).productionSystems?.singleCategory == null ? (FarmScope.read(context).productionSystems == null ? 'Belum diklasifikasi' : 'Pilih Beef atau Dairy') : productionLabel(FarmScope.read(context).productionSystems!.singleCategory)}'),
+                      ],
+                      const SizedBox(height: 14),
+                      if (!canEditAge)
+                        Text(
+                            '${ageEvidenceLabel(widget.cattle!)}. Metadata usia dipertahankan; formulir ini mengubah identitas dasar.')
+                      else
+                        TextFormField(
+                          key: const ValueKey('cattle-age'),
+                          controller: age,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Umur (bulan)',
+                            helperText:
+                                'Estimasi umur; bukan tanggal lahir pasti.',
+                            prefixIcon: Icon(Icons.calendar_month_outlined),
+                          ),
+                          validator: (v) {
+                            final n = int.tryParse(v ?? '');
+                            return n == null || n < 1 || n > 360
+                                ? 'Masukkan umur 1–360 bulan.'
+                                : null;
+                          },
+                        ),
                       const SizedBox(height: 18),
                       const Text('Jenis kelamin'),
                       const SizedBox(height: 8),

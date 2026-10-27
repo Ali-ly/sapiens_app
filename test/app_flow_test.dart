@@ -60,8 +60,9 @@ void main() {
         broken.saveCattle(
           Cattle(nameOrId: 'A', gender: 'Jantan', ageMonths: 12),
         ),
-        throwsException,
+        throwsStateError,
       );
+      expect(broken.error, isNotNull);
       expect(broken.cattle, isEmpty);
     },
   );
@@ -124,6 +125,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      await store.configureProductionSystems(FarmProductionSystems.beef);
       await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
       expect(find.text('Tambah sapi pertama'), findsOneWidget);
@@ -141,7 +143,13 @@ void main() {
         find.widgetWithText(TextFormField, 'Umur (bulan)'),
         '18',
       );
+      await tester.scrollUntilVisible(find.text('Simpan sapi'), 200,
+          scrollable: find
+              .byWidgetPredicate((w) =>
+                  w is Scrollable && w.axisDirection == AxisDirection.down)
+              .last);
       await tester.ensureVisible(find.text('Simpan sapi'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Simpan sapi'));
       await tester.pumpAndSettle();
       expect(store.cattle.length, 1);

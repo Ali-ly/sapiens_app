@@ -2,21 +2,20 @@ import '../models/cattle.dart';
 import '../models/group_record.dart';
 import '../models/legacy_group_membership.dart';
 import '../models/livestock_group.dart';
+import '../models/persisted_time.dart';
 
 class LegacyGroupMigration {
-  static List<LivestockGroup> migrate(
-      List rawGroups,
-      List<LegacyGroupMembership> memberships,
-      List<Cattle> cattle,
-      DateTime migratedAt) {
+  static List<LivestockGroup> migrate(List rawGroups,
+      List<LegacyGroupMembership> memberships, List<Cattle> cattle,
+      [DateTime? migratedAt]) {
     final result = <LivestockGroup>[];
     for (final raw in rawGroups) {
       final json = Map<String, dynamic>.from(raw as Map);
       final id = json['id'] as String;
-      final created = DateTime.parse(json['createdAt'] as String).toUtc();
+      final created = PersistedTime.parse(json['createdAt'] as String);
       final archived = json['archivedAt'] == null
           ? null
-          : DateTime.parse(json['archivedAt'] as String).toUtc();
+          : PersistedTime.parse(json['archivedAt'] as String);
       final ids = memberships
           .where((m) => m.groupId == id && m.active)
           .map((m) => m.cattleId)
@@ -27,23 +26,27 @@ class LegacyGroupMigration {
               ? members.fold(0.0, (sum, c) => sum + c.estimatedWeight!) /
                   members.length
               : null;
-      var at = migratedAt.toUtc();
-      for (final date in [created, if (archived != null) archived]) {
-        if (at.isBefore(date)) {
-          at = date;
-        }
-      }
-      result.add(LivestockGroup(id: id, createdAt: created, history: [
-        GroupRecord(
-            id: 'migration-$id',
-            recordedAt: at,
-            name: json['name'] as String,
-            headCount: members.length,
-            averageWeightKg: average,
-            notes: json['notes'] as String? ?? '',
-            archivedAt: archived,
-            source: 'migration')
-      ]));
+      // A deterministic reference anchor, not the time migration/observation ran.
+      final at = archived ?? created;
+      final anchor = (json['archivedAt'] ?? json['createdAt']) as String;
+      result.add(LivestockGroup(
+          id: id,
+          createdAt: created,
+          createdAtText: json['createdAt'] as String,
+          history: [
+            GroupRecord(
+                id: 'migration-$id',
+                recordedAt: at,
+                recordedAtText: anchor,
+                archivedAtText: json['archivedAt'] as String?,
+                timeBasis: GroupRecordTimeBasis.legacyAnchor,
+                name: json['name'] as String,
+                headCount: members.length,
+                averageWeightKg: average,
+                notes: json['notes'] as String? ?? '',
+                archivedAt: archived,
+                source: 'migration')
+          ]));
     }
     // Retain old rows for export, but reject broken old references before migration.
     final groupIds = result.map((g) => g.id).toSet(),

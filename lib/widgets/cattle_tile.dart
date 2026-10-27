@@ -5,6 +5,7 @@ import '../core/constants/app_colors.dart';
 import '../models/cattle.dart';
 import 'cattle_avatar.dart';
 import 'farm_feedback.dart';
+import 'livestock_labels.dart';
 
 class CattleTile extends StatelessWidget {
   const CattleTile(
@@ -49,7 +50,7 @@ class CattleTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '${cattle.gender} · ${cattle.ageMonths} bulan',
+                        '${cattle.gender} · ${productionLabel(cattle.productionCategory)}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -57,11 +58,13 @@ class CattleTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        ready
-                            ? 'Pakan siap'
-                            : needsWeightCheck
-                                ? 'Perbarui bobot'
-                                : 'Belum ada rencana pakan',
+                        !cattle.isActive
+                            ? cattle.status.label
+                            : ready
+                                ? 'Pakan siap'
+                                : needsWeightCheck
+                                    ? 'Perbarui bobot'
+                                    : 'Belum ada rencana pakan',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,

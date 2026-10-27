@@ -2,9 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../models/production.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../../widgets/form_save_error.dart';
 import '../../widgets/unsaved_changes_guard.dart';
+import 'farm_production_screen.dart';
 
 class FarmSettingsScreen extends StatefulWidget {
   const FarmSettingsScreen({super.key});
@@ -16,13 +19,16 @@ class _FarmSettingsScreenState extends State<FarmSettingsScreen> {
   final form = GlobalKey<FormState>();
   late final TextEditingController name, farm;
   late int days;
+  late String revision;
   bool busy = false, dirty = false;
+  String? saveError;
   @override
   void initState() {
     super.initState();
     name = TextEditingController(text: FarmScope.read(context).farmer);
     farm = TextEditingController(text: FarmScope.read(context).farm);
     days = FarmScope.read(context).reminderDays;
+    revision = FarmScope.read(context).settingsRevision;
   }
 
   @override
@@ -37,10 +43,14 @@ class _FarmSettingsScreenState extends State<FarmSettingsScreen> {
       return;
     }
     FocusScope.of(context).unfocus();
-    setState(() => busy = true);
+    setState(() {
+      busy = true;
+      saveError = null;
+    });
     try {
-      await FarmScope.read(context)
-          .settings(name.text.trim(), farm.text.trim(), days);
+      await FarmScope.read(context).settings(
+          name.text.trim(), farm.text.trim(), days,
+          expectedRevision: revision);
       if (mounted) {
         dirty = false;
         Navigator.pop(context);
@@ -49,9 +59,7 @@ class _FarmSettingsScreenState extends State<FarmSettingsScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        showError(context, e);
-      }
+      if (mounted) setState(() => saveError = errorMessage(e));
     } finally {
       if (mounted) {
         setState(() => busy = false);
@@ -109,12 +117,34 @@ class _FarmSettingsScreenState extends State<FarmSettingsScreen> {
                 ),
               ),
             ),
+            const SectionHeading('Jenis peternakan'),
+            Panel(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  Text(farmTypeLabel(FarmScope.read(context)
+                      .productionSystems
+                      ?.singleCategory)),
+                  const SizedBox(height: 8),
+                  const Text(
+                      'Mengganti jenis menghapus permanen semua sapi dan historinya.'),
+                  TextButton(
+                      onPressed: busy
+                          ? null
+                          : () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                  builder: (_) => const FarmProductionScreen(
+                                      changing: true))),
+                      child: const Text('Ganti jenis peternakan')),
+                ])),
             const SectionHeading('Kapan bobot perlu dicek?'),
             Panel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     value: days,
                     decoration: const InputDecoration(
                       labelText: 'Interval pengecekan',
@@ -148,6 +178,7 @@ class _FarmSettingsScreenState extends State<FarmSettingsScreen> {
                 ],
               ),
             ),
+            if (saveError != null) FormSaveError(message: saveError!),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: busy ? null : save,

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../models/cattle.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../groups/group_list_screen.dart';
@@ -54,11 +55,22 @@ class _CattleListScreenState extends State<CattleListScreen> {
         animation: FarmScope.read(context),
         builder: (context, _) {
           final store = FarmScope.read(context);
-          final list = store.cattle
+          final list = ((filter == 'Arsip' || filter == 'Nonaktif')
+                  ? store.inactiveCattle
+                  : store.cattle)
               .where(
                 (c) =>
                     c.nameOrId.toLowerCase().contains(query.toLowerCase()) &&
                     (filter == 'Semua' ||
+                        filter == 'Arsip' &&
+                            c.status == CattleStatus.archived ||
+                        filter == 'Nonaktif' ||
+                        filter == 'Beef' &&
+                            c.productionCategory == ProductionCategory.beef ||
+                        filter == 'Dairy' &&
+                            c.productionCategory == ProductionCategory.dairy ||
+                        filter == 'Belum diklasifikasi' &&
+                            c.productionCategory == null ||
                         filter == 'Perlu dicek' && store.needsCheck(c) ||
                         c.gender == filter ||
                         filter == 'Pakan belum siap' && !store.planReady(c)),
@@ -73,7 +85,7 @@ class _CattleListScreenState extends State<CattleListScreen> {
             title: 'Kenali setiap sapimu.',
             eyebrow: 'KANDANG DIGITAL',
             subtitle:
-                '${store.cattle.length} sapi · satu tempat untuk semua catatan',
+                '${store.cattle.length} aktif · ${store.inactiveCattle.length} nonaktif',
             back: widget.back,
             action: IconButton.filled(
               tooltip: 'Tambah sapi',
@@ -102,7 +114,14 @@ class _CattleListScreenState extends State<CattleListScreen> {
                   'Jantan',
                   'Betina',
                   'Perlu dicek',
-                  'Pakan belum siap'
+                  'Pakan belum siap',
+                  'Nonaktif',
+                  'Arsip',
+                  if (store.productionSystems != FarmProductionSystems.dairy)
+                    'Beef',
+                  if (store.productionSystems != FarmProductionSystems.beef)
+                    'Dairy',
+                  'Belum diklasifikasi'
                 ]
                     .map(
                       (f) => ChoiceChip(
@@ -154,13 +173,13 @@ class _CattleListScreenState extends State<CattleListScreen> {
               const SizedBox(height: 8),
               if (list.isEmpty)
                 EmptyPanel(
-                  title: store.cattle.isEmpty
+                  title: store.allCattle.isEmpty
                       ? 'Daftarkan sapi pertamamu'
                       : 'Sapi tidak ditemukan',
-                  message: store.cattle.isEmpty
+                  message: store.allCattle.isEmpty
                       ? 'Tambah identitas sapi, lalu catat bobot dan hitung pakannya. Tidak perlu membuat kandang.'
                       : 'Coba kata kunci atau filter yang berbeda.',
-                  action: store.cattle.isEmpty
+                  action: store.allCattle.isEmpty
                       ? FilledButton(
                           onPressed: () => Navigator.push(
                             context,

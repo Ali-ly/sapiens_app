@@ -29,6 +29,20 @@ API pakan menerima bobot rata-rata dan target; takaran per ekor dikalikan jumlah
 
 Tombol **Hitung kebutuhan pakan** di Profil Ternak nonaktif selama bobot belum tersedia dan otomatis aktif setelah bobot manual atau estimasi tersimpan.
 
+Fondasi model bersama, status keluar/arsip, keamanan histori, dan kontrak kompatibilitas dijelaskan dalam [Phase 1 — Data Model Foundation](docs/data-model-foundation.md).
+
+Profil juga menyediakan kategori produksi, status ternak, tahap hidup, catatan kesehatan, dan timeline dari event yang tersimpan. Pengaturan peternakan mendukung Beef, Dairy, atau keduanya; data lama tetap belum berkategori sampai pengguna memilihnya. Lihat [Shared Core UI](docs/shared-core-ui.md) untuk alur dan batas implementasi.
+
+## Beef Module — Phase 4
+
+Profil Beef kini menyediakan tujuan Penggemukan/Pembibitan, fase manual beserta histori, Growth/ADG dan target, evaluasi target jual, serta pencatatan breeding–pemeriksaan–kelahiran. Stok farm dan kebutuhan 1/7/30 hari tersedia dari tab Pakan dengan cakupan sapi Beef individual yang eksplisit. [Alur, rumus deterministik, migrasi, serta batas backend](docs/beef-module.md).
+
+API belum menerima purpose/fase atau konteks Dairy. Perhitungan Beef Penggemukan memakai mode generik terbatas dengan persetujuan pengguna; konteks lain yang belum didukung ditolak. Tidak ada perubahan rumus nutrisi.
+
+## Dairy Module — Phase 5
+
+Profil Dairy menyediakan susu total harian atau AM+PM dengan koreksi berhistori, rata-rata 7/30 hari, siklus dari calving aktual, DIM/paritas dengan sumber eksplisit, reproduksi manual, dan observasi ambing/masa tahan dari tanggal pengguna. Dashboard menyediakan quick entry dan filter fase tanpa membership baru. [Definisi metrik, migrasi, dan batas Dairy](docs/dairy-module.md). Feeding Dairy tetap menunggu dukungan backend.
+
 ## Fitur MVP
 
 - Profil sapi, pencarian, filter, edit identitas, dan riwayat bobot dengan grafik.
@@ -65,23 +79,24 @@ flutter run --dart-define=API_BASE_URL=https://backend.example.com
 flutter build web --release --dart-define=API_BASE_URL=https://backend.example.com
 ```
 
-Backend harus menyediakan `POST /predict-weight` dan `POST /calculate-feed`. Untuk web, backend juga harus mengizinkan CORS dari origin aplikasi. Lihat [kontrak API dan arsitektur](docs/architecture.md).
+Backend individual memakai `POST /v2/weight`, `GET /v2/feeds/{production_category}`, dan `POST /v2/nutrition`. `POST /calculate-feed` tetap diperlukan hanya oleh Group Feed legacy. Untuk web, backend juga harus mengizinkan CORS dari origin aplikasi. Lihat [kontrak API dan arsitektur](docs/architecture.md).
 
-Umur, jenis kelamin, dan kondisi tubuh disimpan sebagai konteks rencana. API pakan saat ini hanya menerima bobot, target, dan bahan tersedia; aplikasi tidak mengklaim konteks lain ikut menentukan perhitungan. Saat API gagal, aplikasi menampilkan error dan tidak membuat rekomendasi pengganti.
+Konteks individual berasal dari Digital Twin; pengguna memilih bahan dari katalog dan mengisi kg/hari. Evaluasi v2 disimpan sebagai snapshot, tanpa otomatis menjadi ransum aktif/stok. Saat API gagal, aplikasi menampilkan error tanpa rekomendasi pengganti. Ransum lama tetap dapat dibaca sebagai histori. [Batas kompatibilitas legacy](docs/legacy-individual-cleanup.md).
 
 ## Data lokal
 
 Browser memakai localStorage; platform native memakai file JSON. Foto ikut disimpan. Penulisan berlangsung berurutan, dan tampilan menerima state baru setelah penyimpanan berhasil. Nama lokasi penyimpanan lama dipertahankan agar pembaruan brand/package tidak memutus akses data pengguna.
 
-Cadangan tersedia pada **Profil → Cadangan data**. Impor memvalidasi seluruh data dan menampilkan konfirmasi sebelum mengganti data perangkat. Ekspor memakai schema versi 4 dengan histori data dan rencana pakan kelompok. Versi 3 dimigrasikan menjadi data kelompok mandiri; relasi lama disimpan sebagai arsip kompatibilitas, tanpa mengendalikan kelompok. Impor versi 2 dan format lama tetap didukung.
+Cadangan tersedia pada **Profil → Cadangan data**. Impor memvalidasi seluruh data dan menampilkan konfirmasi sebelum mengganti data perangkat. Ekspor memakai envelope schema 5 (minimum reader 5), fondasi farm 3, Shared Twin 2, Beef 2 dan Dairy 2. Reader Phase 3 menolak fondasi farm baru agar ledger stok/histori Beef tidak terbuang. Format unversioned dan versi 2/3/4 divalidasi serta dimigrasikan saat load sebelum state diterbitkan. ID farm, bobot dan media dilengkapi tanpa menebak kategori, tanggal lahir, timezone atau event yang tidak tercatat. Histori, bytes foto dan referensi existing dipertahankan. Reader historis yang diuji menolak envelope baru dan memblokir write normal; tidak tersedia export downgrade. Lihat [aturan migrasi dan kompatibilitas](docs/schema-migration.md).
 
 ## Pemeriksaan kode
 
 ```sh
+python3 tool/generate_migration_fixtures.py --check
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test --coverage
-flutter test --platform chrome test/app_flow_test.dart test/command_center_test.dart test/groups_ui_test.dart test/photo_preview_test.dart
+flutter test --platform chrome test/app_flow_test.dart test/command_center_test.dart test/groups_ui_test.dart test/photo_preview_test.dart test/twin_foundation_test.dart test/schema_migration_test.dart test/shared_core_ui_test.dart test/beef_module_test.dart test/beef_ui_test.dart test/dairy_module_test.dart test/dairy_ui_test.dart
 flutter build web --release
 ```
 

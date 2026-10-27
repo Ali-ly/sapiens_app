@@ -1,0 +1,231 @@
+{
+  "format": "sapiens.farm",
+  "schemaVersion": 5,
+  "minimumReaderVersion": 5,
+  "data": {
+    "farmer": "Fixture Farmer",
+    "farm": "Fixture Farm",
+    "reminderDays": 7,
+    "demo": false,
+    "cattle": [
+      {
+        "id": "cow-legacy-1",
+        "name": "Fixture Cow",
+        "gender": "Jantan",
+        "age": 18,
+        "notes": "Do not infer DOB or production category",
+        "weight": 350.0,
+        "spread": 5.0,
+        "valid": 2,
+        "rejected": 0,
+        "history": [
+          {
+            "weight": 300.0,
+            "date": "2020-01-01T12:34:56",
+            "source": "manual",
+            "id": "weight-existing"
+          },
+          {
+            "weight": 350.0,
+            "date": "2020-01-01T12:34:56",
+            "source": "ai",
+            "id": "weight-backfill-2a7a8330f038d19c8232fc0e0788568388a8e55b435b5083918951f77ce80d9d"
+          }
+        ],
+        "images": [
+          {
+            "name": "duplicate.png",
+            "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jV9kAAAAASUVORK5CYII=",
+            "id": "media-backfill-4eb44b56b6889420ab91b1db56420afb384335aaccd29862a9a86a13a2dc00c7"
+          },
+          {
+            "name": "duplicate.png",
+            "bytes": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jV9kAAAAASUVORK5CYII=",
+            "id": "media-backfill-2a7a8330f038d19c8232fc0e0788568388a8e55b435b5083918951f77ce80d9d"
+          }
+        ],
+        "foundation": {
+          "version": 2,
+          "statuses": [
+            {
+              "id": "status-existing",
+              "recordedAt": "2020-01-03T08:00:00+07:00",
+              "status": "sold",
+              "note": "Existing exit"
+            }
+          ],
+          "stages": [],
+          "health": [
+            {
+              "id": "health-existing",
+              "recordedAt": "2020-01-02T08:00:00+07:00",
+              "occurredAt": "2020-01-02T07:00:00+07:00",
+              "kind": "vaccination",
+              "note": "Existing care",
+              "nextDueAt": "2020-02-02T08:00:00+07:00"
+            }
+          ],
+          "photos": [
+            {
+              "id": "photo-record-existing",
+              "recordedAt": "2020-01-01T12:34:56",
+              "imageIndex": 0,
+              "source": "manual",
+              "weightRecordId": "weight-existing",
+              "mediaId": "media-backfill-4eb44b56b6889420ab91b1db56420afb384335aaccd29862a9a86a13a2dc00c7"
+            }
+          ],
+          "timeline": [
+            {
+              "id": "event-weight-existing",
+              "recordedAt": "2020-01-01T12:34:56",
+              "kind": "weightRecorded",
+              "recordId": "weight-existing",
+              "note": ""
+            },
+            {
+              "id": "event-photo-existing",
+              "recordedAt": "2020-01-01T12:34:56",
+              "kind": "photosAdded",
+              "recordId": "photo-record-existing",
+              "note": ""
+            },
+            {
+              "id": "event-health-existing",
+              "recordedAt": "2020-01-02T08:00:00+07:00",
+              "kind": "healthRecorded",
+              "recordId": "health-existing",
+              "note": ""
+            },
+            {
+              "id": "event-status-existing",
+              "recordedAt": "2020-01-03T08:00:00+07:00",
+              "kind": "statusChanged",
+              "recordId": "status-existing",
+              "note": ""
+            }
+          ],
+          "references": {
+            "externalIds": {
+              "earTag": "FIXTURE-1"
+            }
+          },
+          "modules": {
+            "beef": {
+              "version": 2,
+              "records": []
+            },
+            "dairy": {
+              "version": 1
+            }
+          },
+          "ageEvidence": {
+            "certainty": "estimated"
+          }
+        }
+      }
+    ],
+    "feedPlans": [
+      {
+        "id": "plan-existing",
+        "cattleId": "cow-legacy-1",
+        "cattleName": "Fixture Cow",
+        "weightKg": 350.0,
+        "ageMonths": 18,
+        "gender": "Jantan",
+        "bodyCondition": "Sedang",
+        "target": "penggemukan",
+        "availableFeeds": [
+          "rumput"
+        ],
+        "createdAt": "2020-01-02T08:00:00+07:00",
+        "weightDate": "2020-01-01T12:34:56",
+        "portions": [
+          {
+            "key": "rumput",
+            "asFedKg": 20.0,
+            "dryMatterKg": 4.0,
+            "ratio": 100.0
+          }
+        ],
+        "totalDryMatterKg": 4.0,
+        "warning": null,
+        "notes": [
+          "Recorded fixture"
+        ]
+      }
+    ],
+    "groups": [
+      {
+        "id": "group-existing",
+        "createdAt": "2019-01-01T09:00:00+07:00",
+        "history": [
+          {
+            "id": "group-record-1",
+            "recordedAt": "2019-01-02T09:00:00+07:00",
+            "name": "Bulk Group",
+            "headCount": 10,
+            "averageWeightKg": 350.0,
+            "target": "penggemukan",
+            "notes": "First",
+            "archivedAt": null,
+            "source": "manual",
+            "timeBasis": "recorded"
+          },
+          {
+            "id": "group-record-2",
+            "recordedAt": "2020-01-02T09:00:00+07:00",
+            "name": "Bulk Group",
+            "headCount": 12,
+            "averageWeightKg": 360.0,
+            "target": "penggemukan",
+            "notes": "Second",
+            "archivedAt": null,
+            "source": "manual",
+            "timeBasis": "recorded"
+          }
+        ]
+      }
+    ],
+    "groupFeedPlans": [
+      {
+        "id": "group-plan-existing",
+        "groupId": "group-existing",
+        "inputRevision": "group-record-1",
+        "headCount": 10,
+        "averageWeightKg": 350.0,
+        "target": "penggemukan",
+        "createdAt": "2019-01-03T09:00:00+07:00",
+        "availableFeeds": [
+          "rumput"
+        ],
+        "portions": [
+          {
+            "key": "rumput",
+            "asFedKg": 20.0,
+            "dryMatterKg": 4.0,
+            "ratio": 100.0
+          }
+        ],
+        "totalDryMatterKg": 4.0,
+        "warning": null,
+        "notes": []
+      }
+    ],
+    "legacyMemberships": [
+      {
+        "id": "membership-existing",
+        "groupId": "group-existing",
+        "cattleId": "cow-legacy-1",
+        "joinedAt": "2019-02-01T09:00:00",
+        "leftAt": null
+      }
+    ],
+    "foundation": {
+      "version": 3,
+      "feedStock": []
+    },
+    "farmId": "farm-legacy-724fb5004910572c1659d851648f6b1b509db63fad7440c24688c92bf1e02592",
+    "farmIdentityOrigin": "legacyDerived"
+  }
+}

@@ -2,10 +2,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../models/production.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../home/insights_screen.dart';
 import 'backup_screen.dart';
+import 'farm_production_screen.dart';
 import 'farm_settings_screen.dart';
 
 class UserProfileScreen extends StatelessWidget {
@@ -84,9 +86,9 @@ class UserProfileScreen extends StatelessWidget {
     final yes = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Hapus data contoh?'),
+        title: const Text('Arsipkan data contoh?'),
         content: Text(
-          '$count sapi yang berasal dari data contoh, termasuk perubahan dan rencana pakannya, akan dihapus. Sapi yang kamu tambahkan sendiri tetap tersimpan.',
+          '$count sapi yang berasal dari data contoh, akan diarsipkan beserta perubahan dan rencana pakannya. Data tetap dapat dilihat pada Arsip. Sapi yang kamu tambahkan sendiri tetap aktif.',
         ),
         actions: [
           CupertinoDialogAction(
@@ -96,7 +98,7 @@ class UserProfileScreen extends StatelessWidget {
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Hapus contoh'),
+            child: const Text('Arsipkan contoh'),
           )
         ],
       ),
@@ -108,7 +110,7 @@ class UserProfileScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content:
-                  Text('Data contoh dihapus. Sapi milikmu tetap tersimpan.'),
+                  Text('Data contoh diarsipkan. Sapi milikmu tetap aktif.'),
             ),
           );
         }
@@ -170,7 +172,15 @@ class UserProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const StatusPill('PETERNAKAN LOKAL · DATA DI PERANGKAT')
+                    StatusPill(
+                        'Peternak ${farmTypeLabel(store.productionSystems?.singleCategory)}'),
+                    TextButton(
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                                builder: (_) => const FarmProductionScreen(
+                                    changing: true))),
+                        child: const Text('Ganti jenis peternakan'))
                   ],
                 ),
               ),
@@ -228,9 +238,9 @@ class UserProfileScreen extends StatelessWidget {
                     if (store.cattle.any((c) => c.id.startsWith('demo-'))) ...[
                       const Divider(indent: 56, endIndent: 15, height: 1),
                       _item(
-                        CupertinoIcons.trash,
-                        'Hapus data contoh',
-                        'Bersihkan contoh, pertahankan sapi milikmu',
+                        CupertinoIcons.archivebox,
+                        'Arsipkan data contoh',
+                        'Keluarkan contoh dari daftar aktif',
                         () => removeExamples(context),
                       ),
                     ],

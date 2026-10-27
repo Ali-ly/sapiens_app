@@ -10,13 +10,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sapita_app/app.dart';
 import 'package:sapita_app/data/farm_backup_codec.dart';
 import 'package:sapita_app/models/cattle.dart';
+import 'package:sapita_app/models/feed_api_v2.dart';
 import 'package:sapita_app/models/selected_image.dart';
-import 'package:sapita_app/services/feed_response_mapper.dart';
+import 'package:sapita_app/services/cattle_nutrition_context.dart';
 import 'package:sapita_app/services/feed_service.dart';
 import 'package:sapita_app/state/farm_scope.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
-import 'helpers/feed_fixture.dart';
+import 'helpers/backup_fixture.dart';
+import 'helpers/legacy_feed_plan_fixture.dart';
 
 void main() {
   final now = DateTime.utc(2026, 10, 23, 12);
@@ -146,7 +148,8 @@ void main() {
     () async {
       final animal = await addCattle();
       final data = store.exportData();
-      final encoded = (data['cattle'] as List).single as Map<String, dynamic>;
+      final encoded = (backupPayload(data)['cattle'] as List).single
+          as Map<String, dynamic>;
       encoded['weight'] = 999;
       final invalid = jsonEncode(data);
       expect(() => FarmBackupCodec.decode(invalid), throwsFormatException);
@@ -198,27 +201,39 @@ void main() {
       expect(store.checksThisWeek, 1);
     },
   );
-  test(
-    'The feed service returns an immutable plan instead of a raw response map',
-    () async {
-      final animal = await addCattle();
-      final client = MockClient(
-        (_) async => http.Response(jsonEncode(readFeedResponse()), 200),
-      );
-      final plan = await FeedService.calculatePlan(
-        cattle: animal,
-        target: 'penggemukan',
-        condition: 'Sedang',
-        availableFeeds: ['rumput', 'jerami', 'dedak'],
-        client: client,
-      );
-      expect(plan.totalFreshKg, closeTo(27.3, .001));
-      expect(plan.matches(animal), isTrue);
-      expect(() => plan.portions.clear(), throwsUnsupportedError);
-      expect(() => plan.notes.clear(), throwsUnsupportedError);
-      client.close();
-    },
-  );
+  test('Individual v2 result becomes an immutable evaluation snapshot',
+      () async {
+    final original = await addCattle();
+    await store.setProductionCategory(original.id, ProductionCategory.beef,
+        reason: 'Explicit classification');
+    await store.recordBeef(original.id,
+        kind: BeefRecordKind.purpose,
+        purpose: BeefPurpose.fattening,
+        note: 'Recorded purpose');
+    final animal = store.byId(original.id)!;
+    final request = NutritionRequest(
+        cattle: CattleNutritionContext.fromTwin(animal, now),
+        feedItems: [NutritionFeedItem(feedId: 'rumput_gajah', asFedKgDay: 25)]);
+    final client = MockClient((_) async => http.Response(
+        jsonEncode({
+          'production_category': 'beef',
+          'supply': {'protein': 80},
+          'warnings': []
+        }),
+        200));
+    addTearDown(client.close);
+    final response =
+        await FeedService.calculateNutrition(request: request, client: client);
+    final plan = store.createNutritionPlan(
+        cattle: animal, request: request, response: response);
+    expect(plan.isNutritionEvaluation, isTrue);
+    expect(plan.matches(animal), isTrue);
+    expect(() => plan.portions.clear(), throwsUnsupportedError);
+    expect(() => (plan.nutritionSnapshot!.supply as Map)['protein'] = 0,
+        throwsUnsupportedError);
+    expect(() => (plan.nutritionSnapshot!.warnings as List).clear(),
+        throwsUnsupportedError);
+  });
   test(
     'Startup writes wait for persisted data before changing preferences',
     () async {
@@ -238,17 +253,11 @@ void main() {
     'Zero feed plans are rejected during backup import without replacing data',
     () async {
       final animal = await addCattle();
-      final plan = FeedResponseMapper.parse(
-        cattle: animal,
-        target: 'penggemukan',
-        condition: 'Sedang',
-        feeds: ['rumput', 'jerami', 'dedak'],
-        data: readFeedResponse(),
-      );
+      final plan = legacyFeedPlan(cattle: animal, createdAt: store.currentTime);
       await store.savePlan(plan);
       final data = store.exportData();
-      final encoded =
-          (data['feedPlans'] as List).single as Map<String, dynamic>;
+      final encoded = (backupPayload(data)['feedPlans'] as List).single
+          as Map<String, dynamic>;
       for (final portion in encoded['portions'] as List) {
         (portion as Map<String, dynamic>)['asFedKg'] = 0;
       }

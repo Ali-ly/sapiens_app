@@ -5,7 +5,7 @@ import '../../models/cattle.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
 import '../../widgets/photo_preview.dart';
-import '../feed/feed_calculator_screen.dart';
+import '../feed/individual_feed_entry_screen.dart';
 
 class CattleEstimateResultScreen extends StatefulWidget {
   const CattleEstimateResultScreen({super.key, required this.draft});
@@ -51,7 +51,7 @@ class _CattleEstimateResultScreenState
         Navigator.pushReplacement<bool, Cattle>(
           context,
           MaterialPageRoute<bool>(
-              builder: (_) => FeedCalculatorScreen(cattleId: result.id)),
+              builder: (_) => IndividualFeedEntryScreen(cattleId: result.id)),
           result: result,
         );
       } else {

@@ -11,10 +11,12 @@ import 'package:sapita_app/screens/cattle/cattle_estimate_result_screen.dart';
 import 'package:sapita_app/screens/cattle/cattle_list_screen.dart';
 import 'package:sapita_app/screens/cattle/cattle_profile_screen.dart';
 import 'package:sapita_app/screens/feed/feed_calculator_screen.dart';
+import 'package:sapita_app/screens/feed/individual_feed_entry_screen.dart';
 import 'package:sapita_app/screens/home/command_center_screen.dart';
 import 'package:sapita_app/screens/home/widgets/farm_action_tile.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
+import 'helpers/nutrition_fixture.dart';
 import 'helpers/test_app.dart';
 
 void main() {
@@ -196,7 +198,7 @@ void main() {
       );
       await store.savePlan(plan(weighed));
       expect(store.commandCenter.actions, isEmpty);
-      expect(store.exportData()['schemaVersion'], 4);
+      expect(store.exportData()['schemaVersion'], 5);
       final backup = jsonEncode(store.exportData());
       final reloaded = FarmStore(
         now: () => now,
@@ -222,6 +224,7 @@ void main() {
       await store.load();
       await store.saveCattle(animal('Fresh'));
       await store.saveCattle(animal('Due', daysAgo: 8));
+      await store.configureProductionSystems(FarmProductionSystems.beef);
       await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Perlu catatan bobot'), 200,
@@ -395,7 +398,8 @@ void main() {
       await tester.tap(find.text('Simpan & hitung pakan'));
       await tester.pumpAndSettle();
       expect(store.byId(c.id)!.estimatedWeight, 360);
-      expect(find.byType(FeedCalculatorScreen), findsOneWidget);
+      expect(find.byType(IndividualFeedEntryScreen), findsOneWidget);
+      expect(find.text('Atur sistem produksi'), findsOneWidget);
       expect(
         find.byType(CattleEstimateResultScreen, skipOffstage: false),
         findsNothing,
@@ -409,66 +413,68 @@ void main() {
   );
 
   testWidgets(
-    'System back after saving feed finishes the calculator instead of reopening it',
-    (tester) async {
-      final store = FarmStore(
-          now: () => now, read: () async => null, write: (_) async {});
-      await store.load();
-      final c = await store.saveCattle(animal('A'));
-      await tester.pumpWidget(
-        buildTestApp(
-          store: store,
-          home: Builder(
+      'Back after saving v2 evaluation finishes the individual calculator',
+      (tester) async {
+    final store = FarmStore(read: () async => null, write: (_) async {});
+    await store.load();
+    final c = await store.saveCattle(
+        animal('A').copyWith(productionCategory: ProductionCategory.beef));
+    await store.recordBeef(c.id,
+        kind: BeefRecordKind.purpose,
+        purpose: BeefPurpose.fattening,
+        note: 'Purpose');
+    await tester.pumpWidget(buildTestApp(
+        store: store,
+        home: Builder(
             builder: (context) => Scaffold(
-              body: TextButton(
-                child: const Text('Calculate'),
-                onPressed: () => Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                      builder: (_) => FeedCalculatorScreen(
-                            cattleId: c.id,
-                            calculate: (
-                                    {required cattle,
-                                    required target,
-                                    required condition,
-                                    required availableFeeds}) async =>
-                                plan(cattle),
-                          )),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('Calculate'));
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Lihat rekomendasi pakan'), 200,
+                    body: TextButton(
+                  child: const Text('Calculate'),
+                  onPressed: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                          builder: (_) => FeedCalculatorScreen(
+                              cattleId: c.id,
+                              loadFeeds: loadNutritionCatalog,
+                              evaluate: evaluateNutrition))),
+                )))));
+    await tester.tap(find.text('Calculate'));
+    await tester.pumpAndSettle();
+    Future<void> reveal(Finder f) async {
+      await tester.scrollUntilVisible(f, 200,
           scrollable: find
-              .byWidgetPredicate((widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down)
+              .byWidgetPredicate((w) =>
+                  w is Scrollable && w.axisDirection == AxisDirection.down)
               .last);
-      await tester.tap(find.text('Lihat rekomendasi pakan'));
+      await tester.ensureVisible(f);
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-          find.text('Gunakan & simpan rencana'), 200,
-          scrollable: find
-              .byWidgetPredicate((widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down)
-              .last);
-      await tester.tap(find.text('Gunakan & simpan rencana'));
-      await tester.pumpAndSettle();
-      expect(store.feedPlans, hasLength(1));
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.text('Calculate'), findsOneWidget);
-      expect(
-          find.byType(FeedCalculatorScreen, skipOffstage: false), findsNothing);
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    },
-  );
+    }
+
+    await reveal(find.byKey(const ValueKey('nutrition-target-adg')));
+    await tester.enterText(
+        find.byKey(const ValueKey('nutrition-target-adg')), '0.5');
+    await reveal(find.byKey(const ValueKey('feed-select-rumput_gajah')));
+    await tester.tap(find.byKey(const ValueKey('feed-select-rumput_gajah')));
+    await tester.pumpAndSettle();
+    await reveal(find.byKey(const ValueKey('feed-quantity-rumput_gajah')));
+    await tester.enterText(
+        find.byKey(const ValueKey('feed-quantity-rumput_gajah')), '25');
+    await reveal(find.text('Evaluasi nutrisi'));
+    await tester.tap(find.text('Evaluasi nutrisi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hasil evaluasi nutrisi'), findsOneWidget);
+    await reveal(find.text('Simpan evaluasi'));
+    await tester.tap(find.text('Simpan evaluasi'));
+    await tester.pumpAndSettle();
+    expect(store.feedPlans.single.isNutritionEvaluation, isTrue);
+    expect(store.planReady(store.byId(c.id)!), isFalse);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Calculate'), findsOneWidget);
+    expect(
+        find.byType(FeedCalculatorScreen, skipOffstage: false), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
 
   for (final width in [320.0, 390.0, 430.0]) {
     testWidgets(
@@ -485,6 +491,7 @@ void main() {
         );
         await store.load();
         await store.addExamples();
+        await store.configureProductionSystems(FarmProductionSystems.beef);
         await tester.pumpWidget(SapiensApp(store: store));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(

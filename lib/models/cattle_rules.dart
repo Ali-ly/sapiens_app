@@ -12,7 +12,7 @@ class CattleRules {
       weight.isFinite && weight >= minimumWeight && weight <= maximumWeight;
 
   static void validate(Cattle animal, {bool requireId = true}) {
-    if (requireId && animal.id.isEmpty ||
+    if (requireId && animal.id.trim().isEmpty ||
         animal.nameOrId.trim().isEmpty ||
         animal.nameOrId.trim().length > 60 ||
         animal.notes.length > 500 ||

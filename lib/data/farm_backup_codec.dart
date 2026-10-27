@@ -1,192 +1,154 @@
 import 'dart:convert';
 
-import 'package:image_picker/image_picker.dart';
-
-import '../models/cattle.dart';
-import '../models/cattle_rules.dart';
 import '../models/farm_snapshot.dart';
-import '../models/feed_plan.dart';
-import '../models/feed_plan_rules.dart';
-import '../models/group_feed_plan.dart';
-import '../models/group_rules.dart';
-import '../models/legacy_group_membership.dart';
-import '../models/livestock_group.dart';
-import '../models/selected_image.dart';
-import 'legacy_group_migration.dart';
+import 'cattle_codec.dart';
+import 'farm_payload_codec.dart';
+import 'snapshot_upgrade.dart';
+import 'twin_codec.dart';
 
-/// Owns the persisted JSON schema. The same decoder validates imports and disk reads.
+class FarmReadResult {
+  const FarmReadResult(this.snapshot, this.sourceSchema,
+      {this.foundationUpgrade = false});
+  final bool foundationUpgrade;
+  final FarmSnapshot snapshot;
+  final int? sourceSchema;
+  bool get needsUpgrade =>
+      sourceSchema != FarmBackupCodec.schemaVersion || foundationUpgrade;
+}
+
+/// Schema 5 is an envelope, with no legacy root aliases. Historical versionless
+/// readers must fail their required-field casts instead of ignoring new fields.
 class FarmBackupCodec {
+  static const schemaVersion = 5;
+  static const format = 'sapiens.farm';
   static Map<String, dynamic> encode(FarmSnapshot snapshot,
-          {DateTime? exportedAt}) =>
-      {
-        'schemaVersion': 4,
-        'farmer': snapshot.farmer,
-        'farm': snapshot.farm,
-        'reminderDays': snapshot.reminderDays,
-        'demo': snapshot.hasExamples,
-        if (exportedAt != null) 'exportedAt': exportedAt.toIso8601String(),
-        'cattle': snapshot.cattle.map(_encodeCattle).toList(),
-        'feedPlans': snapshot.feedPlans.map((plan) => plan.toJson()).toList(),
-        'groups': snapshot.groups.map((group) => group.toJson()).toList(),
-        'groupFeedPlans':
-            snapshot.groupFeedPlans.map((plan) => plan.toJson()).toList(),
-        'legacyMemberships': snapshot.legacyMemberships
-            .map((membership) => membership.toJson())
-            .toList(),
-      };
-  static FarmSnapshot decode(String raw, {DateTime? migratedAt}) {
+      {DateTime? exportedAt}) {
+    final value = SnapshotUpgrade.complete(snapshot);
+    return {
+      'format': format,
+      'schemaVersion': schemaVersion,
+      'minimumReaderVersion': schemaVersion,
+      if (exportedAt != null)
+        'exportedAt': exportedAt.toUtc().toIso8601String(),
+      'data': {
+        'farmId': value.farmId,
+        'farmIdentityOrigin': value.farmIdentityOrigin.name,
+        'foundation': {
+          'version': 3,
+          'feedStock': value.feedStock.map((e) => e.toJson()).toList(),
+          if (value.productionSystems != null)
+            'productionSystems': value.productionSystems!.name
+        },
+        'farmer': value.farmer,
+        'farm': value.farm,
+        'reminderDays': value.reminderDays,
+        'demo': value.hasExamples,
+        'cattle': value.cattle.map(CattleCodec.encode).toList(),
+        'feedPlans': value.feedPlans.map((p) => p.toJson()).toList(),
+        'groups': value.groups.map((g) => g.toJson()).toList(),
+        'groupFeedPlans': value.groupFeedPlans.map((p) => p.toJson()).toList(),
+        'legacyMemberships':
+            value.legacyMemberships.map((m) => m.toJson()).toList(),
+      },
+    };
+  }
+
+  static bool _legacyDairy(Map<String, dynamic> data) =>
+      (data['cattle'] as List).any((c) {
+        final modules = (c['foundation'] as Map)['modules'] as Map;
+        return (modules['dairy'] as Map?)?['version'] == 1;
+      });
+
+  static FarmSnapshot decode(String raw, {DateTime? migratedAt}) =>
+      read(raw).snapshot;
+  static FarmReadResult read(String raw) {
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
+      final j = jsonDecode(raw);
+      if (j is! Map<String, dynamic>) {
         throw const FormatException('Format cadangan tidak dikenali.');
       }
-      if (decoded['schemaVersion'] != null &&
-          decoded['schemaVersion'] != 2 &&
-          decoded['schemaVersion'] != 3 &&
-          decoded['schemaVersion'] != 4) {
-        throw const FormatException('Versi cadangan belum didukung.');
+      final requiredReader = j['minimumReaderVersion'];
+      if (j.containsKey('minimumReaderVersion') &&
+          (requiredReader is! int ||
+              requiredReader < 1 ||
+              requiredReader > schemaVersion)) {
+        throw const FormatException('Data membutuhkan pembaca lebih baru.');
       }
-      final items = (decoded['cattle'] as List)
-          .map((e) => _decodeCattle(Map<String, dynamic>.from(e as Map)))
-          .toList();
-      final ids = <String>{}, names = <String>{};
-      for (final c in items) {
-        CattleRules.validate(c);
-        if (!ids.add(c.id) || !names.add(c.nameOrId.trim().toLowerCase())) {
-          throw const FormatException(
-            'Identitas sapi dalam cadangan duplikat.',
-          );
-        }
-      }
-      final plans = (decoded['feedPlans'] as List? ?? [])
-          .map((e) => FeedPlan.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-      final planIds = <String>{};
-      for (final plan in plans) {
-        FeedPlanRules.validate(plan);
-        if (!ids.contains(plan.cattleId) || !planIds.add(plan.id)) {
-          throw const FormatException(
-            'Rencana pakan tidak memiliki sapi yang sesuai atau ID-nya duplikat.',
-          );
-        }
-      }
-      if (decoded['farmer'] is! String ||
-          (decoded['farmer'] as String).trim().isEmpty ||
-          decoded['farm'] is! String ||
-          (decoded['farm'] as String).trim().isEmpty) {
+      final version = j['schemaVersion'];
+      if (version != null &&
+          (version is! int || !{2, 3, 4, 5}.contains(version))) {
         throw const FormatException(
-          'Identitas peternakan dalam cadangan tidak lengkap.',
-        );
+            'Versi data belum didukung. Gunakan aplikasi yang sesuai.');
       }
-      final days = decoded['reminderDays'] ?? 7;
-      if (days is! int || !CattleRules.reminderIntervals.contains(days)) {
-        throw const FormatException('Interval pengecekan tidak valid.');
+      if (version == schemaVersion) {
+        TwinCodec.fields(j, {
+          'format',
+          'schemaVersion',
+          'minimumReaderVersion',
+          'exportedAt',
+          'data'
+        });
+        if (j['format'] != format ||
+            j['minimumReaderVersion'] is! int ||
+            j['minimumReaderVersion'] != schemaVersion) {
+          throw const FormatException('Reader data ini belum didukung.');
+        }
+        if (j.containsKey('exportedAt')) {
+          DateTime.parse(j['exportedAt'] as String);
+        }
+        final data = TwinCodec.object(j['data'], {
+          'farmId',
+          'farmIdentityOrigin',
+          'foundation',
+          'farmer',
+          'farm',
+          'reminderDays',
+          'demo',
+          'cattle',
+          'feedPlans',
+          'groups',
+          'groupFeedPlans',
+          'legacyMemberships'
+        });
+        if (!data.keys.toSet().containsAll({
+              'farmId',
+              'farmIdentityOrigin',
+              'foundation',
+              'farmer',
+              'farm',
+              'reminderDays',
+              'demo',
+              'cattle',
+              'feedPlans',
+              'groups',
+              'groupFeedPlans',
+              'legacyMemberships'
+            }) ||
+            data['feedPlans'] is! List ||
+            data['demo'] is! bool) {
+          throw const FormatException('Payload schema 5 tidak lengkap.');
+        }
+        final foundationVersion = (data['foundation'] as Map)['version'];
+        if (foundationVersion != 2 && foundationVersion != 3) {
+          throw const FormatException('Versi farm belum didukung.');
+        }
+        return FarmReadResult(
+            FarmPayloadCodec.decode(data,
+                schemaVersion: schemaVersion,
+                foundationVersion: foundationVersion as int,
+                requireIdentity: true),
+            schemaVersion,
+            foundationUpgrade: foundationVersion == 2 || _legacyDairy(data));
       }
-      final version = decoded['schemaVersion'];
-      if ((version == 3 &&
-              (decoded['groups'] is! List ||
-                  decoded['memberships'] is! List)) ||
-          (version == 4 &&
-              (decoded['groups'] is! List ||
-                  decoded['legacyMemberships'] is! List ||
-                  decoded['groupFeedPlans'] is! List))) {
-        throw const FormatException(
-            'Data kelompok dalam cadangan tidak lengkap.');
-      }
-      final legacy = ((version == 4
-                  ? decoded['legacyMemberships']
-                  : decoded['memberships']) as List? ??
-              [])
-          .map((value) => LegacyGroupMembership.fromJson(
-              Map<String, dynamic>.from(value as Map)))
-          .toList();
-      final rawGroups = decoded['groups'] as List? ?? [];
-      final groups = version == 4
-          ? rawGroups
-              .map((value) => LivestockGroup.fromJson(
-                  Map<String, dynamic>.from(value as Map)))
-              .toList()
-          : LegacyGroupMigration.migrate(
-              rawGroups, legacy, items, migratedAt ?? DateTime.now());
-      final groupPlans = version == 4
-          ? (decoded['groupFeedPlans'] as List)
-              .map((value) => GroupFeedPlan.fromJson(
-                  Map<String, dynamic>.from(value as Map)))
-              .toList()
-          : <GroupFeedPlan>[];
-      final snapshot = FarmSnapshot(
-        farmer: decoded['farmer'] as String,
-        farm: decoded['farm'] as String,
-        reminderDays: days,
-        cattle: items,
-        feedPlans: plans,
-        groups: groups,
-        legacyMemberships: legacy,
-        groupFeedPlans: groupPlans,
-      );
-      GroupRules.validate(snapshot);
-      return snapshot;
+      // Validate the historical representation before filling any missing IDs.
+      final legacy = FarmPayloadCodec.decode(j,
+          schemaVersion: version as int? ?? 2, foundationVersion: 1);
+      return FarmReadResult(SnapshotUpgrade.complete(legacy), version);
     } on FormatException {
       rethrow;
     } catch (_) {
       throw const FormatException(
-        'Cadangan tidak dapat dibaca. Gunakan JSON hasil ekspor SAPIENS.',
-      );
+          'Cadangan tidak dapat dibaca. Gunakan JSON hasil ekspor SAPIENS.');
     }
   }
-
-  static Map<String, dynamic> _encodeCattle(Cattle c) => {
-        'id': c.id,
-        'name': c.nameOrId,
-        'gender': c.gender,
-        'age': c.ageMonths,
-        'notes': c.notes,
-        'weight': c.estimatedWeight,
-        'spread': c.predictionSpread,
-        'valid': c.validImages,
-        'rejected': c.rejectedImages,
-        'history': c.history
-            .map(
-              (r) => {
-                'weight': r.weightKg,
-                'date': r.date.toIso8601String(),
-                'source': r.source
-              },
-            )
-            .toList(),
-        'images': c.images
-            .map((i) => {'name': i.file.name, 'bytes': base64Encode(i.bytes)})
-            .toList(),
-      };
-  static Cattle _decodeCattle(Map<String, dynamic> json) => Cattle(
-        id: json['id'] as String,
-        nameOrId: json['name'] as String,
-        gender: json['gender'] as String,
-        ageMonths: json['age'] as int,
-        notes: json['notes'] as String? ?? '',
-        estimatedWeight: (json['weight'] as num?)?.toDouble(),
-        predictionSpread: (json['spread'] as num?)?.toDouble(),
-        validImages: json['valid'] as int? ?? 0,
-        rejectedImages: json['rejected'] as int? ?? 0,
-        history: (json['history'] as List).map(
-          (value) {
-            final record = Map<String, dynamic>.from(value as Map);
-            return WeightRecord(
-              weightKg: (record['weight'] as num).toDouble(),
-              date: DateTime.parse(record['date'] as String),
-              source: record['source'] as String? ?? 'unknown',
-            );
-          },
-        ).toList(),
-        images: (json['images'] as List).map(
-          (value) {
-            final image = Map<String, dynamic>.from(value as Map);
-            final bytes = base64Decode(image['bytes'] as String);
-            return SelectedImage(
-              file: XFile.fromData(bytes, name: image['name'] as String),
-              bytes: bytes,
-            );
-          },
-        ).toList(),
-      );
 }

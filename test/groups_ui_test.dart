@@ -10,17 +10,17 @@ import 'package:sapita_app/models/cattle.dart';
 import 'package:sapita_app/screens/cattle/add_cattle_screen.dart';
 import 'package:sapita_app/screens/cattle/cattle_list_screen.dart';
 import 'package:sapita_app/screens/cattle/cattle_profile_screen.dart';
-import 'package:sapita_app/screens/feed/feed_calculator_screen.dart';
 import 'package:sapita_app/screens/feed/feed_hub_screen.dart';
 import 'package:sapita_app/screens/feed/feed_shopping_screen.dart';
+import 'package:sapita_app/screens/feed/individual_feed_entry_screen.dart';
 import 'package:sapita_app/screens/groups/group_detail_screen.dart';
 import 'package:sapita_app/screens/groups/group_feed_screen.dart';
 import 'package:sapita_app/screens/groups/group_list_screen.dart';
-import 'package:sapita_app/services/feed_response_mapper.dart';
 import 'package:sapita_app/services/group_feed_service.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
 import 'helpers/feed_fixture.dart';
+import 'helpers/legacy_feed_plan_fixture.dart';
 import 'helpers/test_app.dart';
 
 Future<void> reveal(WidgetTester tester, Finder target) async {
@@ -60,14 +60,14 @@ void main() {
           findsOneWidget);
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(find.byType(FeedCalculatorScreen), findsNothing);
+      expect(find.byType(IndividualFeedEntryScreen), findsNothing);
       await store.recordWeight(c.id, weightKg: 350, source: source);
       await tester.pumpAndSettle();
       await tester.ensureVisible(button);
       expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
       await tester.tap(button);
       await tester.pumpAndSettle();
-      expect(find.byType(FeedCalculatorScreen), findsOneWidget);
+      expect(find.byType(IndividualFeedEntryScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       store.dispose();
@@ -174,10 +174,12 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final store = FarmStore(read: () async => null, write: (_) async {});
       await store.load();
+      await store.configureProductionSystems(FarmProductionSystems.beef);
       if (hasGroups) {
         await store.createGroup('Kandang besar',
             headCount: 100, averageWeightKg: 350);
       }
+      await store.configureProductionSystems(FarmProductionSystems.beef);
       await tester.pumpWidget(SapiensApp(store: store));
       await tester.pumpAndSettle();
       expect(find.text('Mulai dari sapi pertamamu.'), findsOneWidget);
@@ -237,6 +239,7 @@ void main() {
         .saveCattle(Cattle(nameOrId: 'Budi', gender: 'Jantan', ageMonths: 18));
     await store.createGroup('Kandang besar',
         headCount: 100, averageWeightKg: 350);
+    await store.configureProductionSystems(FarmProductionSystems.beef);
     await tester.pumpWidget(SapiensApp(store: store));
     await tester.pumpAndSettle();
     await reveal(tester, find.text('Lihat sapimu'));
@@ -264,12 +267,8 @@ void main() {
     final cattle = await store
         .saveCattle(Cattle(nameOrId: 'Budi', gender: 'Jantan', ageMonths: 18));
     await store.recordWeight(cattle.id, weightKg: 350, source: 'manual');
-    await store.savePlan(FeedResponseMapper.parse(
-        cattle: store.cattle.single,
-        target: 'penggemukan',
-        condition: 'Sedang',
-        feeds: ['rumput', 'jerami', 'dedak'],
-        data: readFeedResponse()));
+    await store.savePlan(legacyFeedPlan(
+        cattle: store.cattle.single, createdAt: store.currentTime));
     await tester.pumpWidget(
         buildTestApp(store: store, home: const FeedShoppingScreen()));
     await tester.pumpAndSettle();

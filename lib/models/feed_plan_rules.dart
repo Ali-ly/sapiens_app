@@ -1,10 +1,64 @@
+import '../data/json_value.dart';
+import 'beef/beef_feed_context.dart';
 import 'cattle_rules.dart';
 import 'feed_plan.dart';
+import 'production.dart';
 
 class FeedPlanRules {
   static const bodyConditions = {'Kurus', 'Sedang', 'Gemuk', 'Tidak tahu'};
 
   static void validate(FeedPlan plan) {
+    if (plan.isNutritionEvaluation) {
+      final request = plan.nutritionRequest;
+      if (request == null) {
+        throw const FormatException('Input evaluasi belum tersedia.');
+      }
+      if (plan.nutritionSnapshot == null ||
+          plan.beefContext != null ||
+          plan.productionCategory != request.productionCategory ||
+          request.cattle.bodyWeightKg != plan.weightKg ||
+          plan.id.isEmpty ||
+          plan.cattleId.isEmpty ||
+          plan.cattleName.trim().isEmpty ||
+          !CattleRules.isValidWeight(plan.weightKg) ||
+          !CattleRules.genders.contains(plan.gender) ||
+          plan.ageMonths < 1 ||
+          plan.ageMonths > CattleRules.maximumAgeMonths ||
+          plan.target != null ||
+          plan.bodyCondition != null ||
+          !plan.totalFreshKg.isFinite ||
+          request.feedItems.isEmpty ||
+          request.feedItems.any((f) => f.asFedKgDay <= 0) ||
+          request.feedItems.map((f) => f.feedId).toSet().length !=
+              request.feedItems.length ||
+          !sameJson(plan.availableFeeds,
+              request.feedItems.map((f) => f.feedId).toList()) ||
+          !sameJson(
+              plan.portions.map((p) => p.toJson()).toList(),
+              request.feedItems
+                  .map((f) => FeedPortion(key: f.feedId, asFedKg: f.asFedKgDay)
+                      .toJson())
+                  .toList()) ||
+          plan.totalDryMatterKg != null ||
+          plan.warning != null ||
+          plan.notes.isNotEmpty) {
+        throw const FormatException(
+            'Snapshot evaluasi nutrisi tidak sesuai input.');
+      }
+      return;
+    }
+    if (plan.nutritionRequest != null) {
+      throw const FormatException('Tipe evaluasi tidak sesuai input.');
+    }
+    if (plan.nutritionSnapshot != null &&
+        plan.beefContext != null &&
+        plan.productionCategory != ProductionCategory.beef) {
+      throw const FormatException(
+          'Snapshot Dairy tidak sesuai konteks rencana Beef.');
+    }
+    if (plan.beefContext != null) {
+      BeefFeedContext.fromJson(plan.beefContext!.toJson());
+    }
     if (plan.id.isEmpty ||
         plan.cattleId.isEmpty ||
         plan.cattleName.trim().isEmpty ||

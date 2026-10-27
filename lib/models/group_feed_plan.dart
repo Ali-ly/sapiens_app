@@ -1,5 +1,6 @@
 import 'feed_plan.dart';
 import 'livestock_group.dart';
+import 'persisted_time.dart';
 
 /// API ration per animal, with the exact bulk inputs used for multiplication.
 class GroupFeedPlan {
@@ -11,6 +12,7 @@ class GroupFeedPlan {
       required this.averageWeightKg,
       required this.target,
       required this.createdAt,
+      this.createdAtText,
       required List<String> availableFeeds,
       required List<FeedPortion> portions,
       this.totalDryMatterKg,
@@ -22,6 +24,7 @@ class GroupFeedPlan {
   final String id, groupId, inputRevision, target;
   final int headCount;
   final double averageWeightKg;
+  final String? createdAtText;
   final DateTime createdAt;
   final List<String> availableFeeds, notes;
   final List<FeedPortion> portions;
@@ -50,7 +53,7 @@ class GroupFeedPlan {
         'headCount': headCount,
         'averageWeightKg': averageWeightKg,
         'target': target,
-        'createdAt': createdAt.toIso8601String(),
+        'createdAt': PersistedTime.encode(createdAt, createdAtText),
         'availableFeeds': availableFeeds,
         'portions': portions.map((p) => p.toJson()).toList(),
         'totalDryMatterKg': totalDryMatterKg,
@@ -64,7 +67,8 @@ class GroupFeedPlan {
       headCount: json['headCount'] as int,
       averageWeightKg: (json['averageWeightKg'] as num).toDouble(),
       target: json['target'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+      createdAtText: json['createdAt'] as String,
+      createdAt: PersistedTime.parse(json['createdAt'] as String),
       availableFeeds: List<String>.from(json['availableFeeds'] as List),
       portions: (json['portions'] as List)
           .map((p) => FeedPortion.fromJson(Map<String, dynamic>.from(p as Map)))

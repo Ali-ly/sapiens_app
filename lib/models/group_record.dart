@@ -1,8 +1,15 @@
+import 'persisted_time.dart';
+
+enum GroupRecordTimeBasis { recorded, legacyAnchor, legacyUnspecified }
+
 /// A full, immutable observation of the bulk herd, including operator changes.
 class GroupRecord {
   const GroupRecord(
       {required this.id,
       required this.recordedAt,
+      this.recordedAtText,
+      this.archivedAtText,
+      this.timeBasis = GroupRecordTimeBasis.recorded,
       required this.name,
       required this.headCount,
       this.averageWeightKg,
@@ -12,6 +19,8 @@ class GroupRecord {
       this.source = 'manual'});
   final String id, name, target, notes, source;
   final DateTime recordedAt;
+  final String? recordedAtText, archivedAtText;
+  final GroupRecordTimeBasis timeBasis;
   final int headCount;
   final double? averageWeightKg;
   final DateTime? archivedAt;
@@ -38,21 +47,31 @@ class GroupRecord {
           target: target ?? this.target,
           notes: notes ?? this.notes,
           archivedAt: clearArchive ? null : archivedAt ?? this.archivedAt,
-          source: source ?? this.source);
+          source: source ?? this.source,
+          archivedAtText:
+              clearArchive || archivedAt != null ? null : archivedAtText);
   Map<String, dynamic> toJson() => {
         'id': id,
-        'recordedAt': recordedAt.toIso8601String(),
+        'recordedAt': PersistedTime.encode(recordedAt, recordedAtText),
         'name': name,
         'headCount': headCount,
         'averageWeightKg': averageWeightKg,
         'target': target,
         'notes': notes,
-        'archivedAt': archivedAt?.toIso8601String(),
-        'source': source
+        'archivedAt': PersistedTime.optional(archivedAt, archivedAtText),
+        'source': source,
+        'timeBasis': timeBasis.name
       };
   factory GroupRecord.fromJson(Map<String, dynamic> json) => GroupRecord(
       id: json['id'] as String,
-      recordedAt: DateTime.parse(json['recordedAt'] as String).toUtc(),
+      recordedAt: PersistedTime.parse(json['recordedAt'] as String),
+      recordedAtText: json['recordedAt'] as String,
+      archivedAtText: json['archivedAt'] as String?,
+      timeBasis: json['timeBasis'] == null
+          ? (json['source'] == 'migration'
+              ? GroupRecordTimeBasis.legacyUnspecified
+              : GroupRecordTimeBasis.recorded)
+          : GroupRecordTimeBasis.values.byName(json['timeBasis'] as String),
       name: json['name'] as String,
       headCount: json['headCount'] as int,
       averageWeightKg: (json['averageWeightKg'] as num?)?.toDouble(),
@@ -61,5 +80,5 @@ class GroupRecord {
       source: json['source'] as String? ?? 'manual',
       archivedAt: json['archivedAt'] == null
           ? null
-          : DateTime.parse(json['archivedAt'] as String).toUtc());
+          : PersistedTime.parse(json['archivedAt'] as String));
 }

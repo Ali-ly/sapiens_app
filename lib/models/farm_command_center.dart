@@ -1,9 +1,16 @@
+import 'beef/beef_feed_context.dart';
 import 'cattle.dart';
 import 'farm_snapshot.dart';
 import 'farm_status.dart';
 import 'feed_plan.dart';
 
-enum FarmActionKind { recordWeight, checkWeight, calculateFeed, refreshFeed }
+enum FarmActionKind {
+  recordWeight,
+  checkWeight,
+  calculateFeed,
+  refreshFeed,
+  reviewFeedContext
+}
 
 enum FarmActivityKind { weight, feedPlan }
 
@@ -66,7 +73,7 @@ class FarmCommandCenter {
     final actions = <FarmAction>[];
     final activity = <FarmActivity>[];
     final totals = <String, double>{};
-    for (final animal in snapshot.cattle) {
+    for (final animal in snapshot.cattle.where((c) => c.isActive)) {
       final latest = FarmStatus.latestPlan(snapshot.feedPlans, animal.id);
       weight += animal.estimatedWeight ?? 0;
       if (animal.estimatedWeight == null || animal.history.isEmpty) {
@@ -81,11 +88,24 @@ class FarmCommandCenter {
         due++;
         actions
             .add(FarmAction(cattle: animal, kind: FarmActionKind.checkWeight));
+      } else if (BeefFeedContext.limitation(
+                  animal,
+                  animal.modules.beef?.phase == BeefPhase.growing
+                      ? 'pertumbuhan'
+                      : 'penggemukan') !=
+              null ||
+          animal.productionCategory == ProductionCategory.beef &&
+              latest != null &&
+              latest.beefContext == null) {
+        actions.add(
+            FarmAction(cattle: animal, kind: FarmActionKind.reviewFeedContext));
       } else if (latest == null) {
         actions.add(
           FarmAction(cattle: animal, kind: FarmActionKind.calculateFeed),
         );
-      } else if (!latest.matches(animal)) {
+      } else if (!latest.matches(animal) ||
+          animal.productionCategory == ProductionCategory.beef &&
+              latest.createdAt.isAfter(now)) {
         actions
             .add(FarmAction(cattle: animal, kind: FarmActionKind.refreshFeed));
       }
@@ -151,7 +171,7 @@ class FarmCommandCenter {
     );
     return FarmCommandCenter._(
       asOf: now,
-      cattleCount: snapshot.cattle.length,
+      cattleCount: snapshot.cattle.where((c) => c.isActive).length,
       unweighedCount: unweighed,
       dueCount: due,
       readyCount: ready,

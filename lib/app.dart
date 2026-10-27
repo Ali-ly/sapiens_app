@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_strings.dart';
 import 'core/theme/app_theme.dart';
+import 'models/production.dart';
 import 'screens/main_screen.dart';
+import 'screens/profile/farm_production_screen.dart';
 import 'state/farm_scope.dart';
 import 'state/farm_store.dart';
 
@@ -54,7 +56,19 @@ class _SapiensAppState extends State<SapiensApp> {
             ),
             child: child ?? const SizedBox.shrink(),
           ),
-          home: const MainScreen(),
+          home: AnimatedBuilder(
+            animation: _store,
+            builder: (context, _) {
+              if (!_store.ready) {
+                return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()));
+              }
+              if (_store.error != null) return const MainScreen();
+              final category = _store.productionSystems?.singleCategory;
+              if (category == null) return const FarmProductionScreen();
+              return MainScreen(key: ValueKey(category));
+            },
+          ),
         ),
       );
 }

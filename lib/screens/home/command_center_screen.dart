@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../models/farm_command_center.dart';
+import '../../models/production.dart';
 import '../../state/farm_scope.dart';
 import '../../widgets/farm_ui.dart';
+import '../beef/beef_dashboard_screen.dart';
 import '../cattle/add_cattle_screen.dart';
 import '../cattle/cattle_profile_screen.dart';
+import '../dairy/dairy_dashboard_screen.dart';
 import '../feed/feed_result_screen.dart';
 import '../feed/feed_shopping_screen.dart';
 import '../profile/backup_screen.dart';
+import '../profile/farm_production_screen.dart';
 import '../profile/farm_settings_screen.dart';
 import 'farm_actions_screen.dart';
 import 'insights_screen.dart';
@@ -42,7 +46,8 @@ class CommandCenterScreen extends StatelessWidget {
             title: store.farmer == 'Peternak'
                 ? 'Selamat datang di SAPIENS.'
                 : 'Halo, ${store.farmer}.',
-            subtitle: '${store.farm} · ${dateLabel(center.asOf)}',
+            subtitle:
+                '${farmTypeLabel(store.productionSystems?.singleCategory)} · ${store.farm} · ${dateLabel(center.asOf)}',
             eyebrow: 'SAPIENS / FARM COMMAND CENTER',
             action: IconButton(
               tooltip: 'Pengaturan peternakan',
@@ -207,6 +212,13 @@ class CommandCenterScreen extends StatelessWidget {
                 center: center,
                 onPrepareFeed: () => open(context, const FeedShoppingScreen()),
               ),
+              if (store.activeBeef.isNotEmpty)
+                TextButton.icon(
+                    onPressed: () => open(context, const BeefDashboardScreen()),
+                    icon: const Icon(Icons.insights_outlined),
+                    label: Text(
+                        'Ringkasan Beef · ${store.activeBeef.length} sapi aktif')),
+              if (store.activeDairy.isNotEmpty) const DairyHomeSummary(),
               const SectionHeading('Aktivitas terbaru'),
               if (center.activity.isEmpty)
                 const InfoBanner(

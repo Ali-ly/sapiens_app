@@ -10,6 +10,7 @@ import 'package:sapita_app/models/livestock_group.dart';
 import 'package:sapita_app/services/group_feed_service.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
+import 'helpers/backup_fixture.dart';
 import 'helpers/feed_fixture.dart';
 
 void main() {
@@ -71,7 +72,7 @@ void main() {
     expect(g.averageWeightKg, 350);
     expect(g.target, 'penggemukan');
     expect(g.history, hasLength(1));
-    expect(store.exportData()['schemaVersion'], 4);
+    expect(store.exportData()['schemaVersion'], 5);
     final loaded =
         FarmStore(now: () => now, read: () async => disk, write: (_) async {});
     await loaded.load();
@@ -138,7 +139,11 @@ void main() {
           target: field == 'target' ? 'pertumbuhan' : null);
       expect(store.groupDailyFeedTotals, isEmpty);
       expect(store.groupPlanReady(store.groupById(g.id)!), isFalse);
-      await expectLater(store.saveGroupPlan(old), throwsStateError);
+      await store
+          .saveGroupPlan(old); // Identical retry does not create new history.
+      final staleNew =
+          GroupFeedPlan.fromJson({...old.toJson(), 'id': 'new-stale-plan'});
+      await expectLater(store.saveGroupPlan(staleNew), throwsStateError);
       expect(store.groupFeedPlans, hasLength(1));
     });
   }
@@ -248,7 +253,7 @@ void main() {
     expect(store.groups.single.history, hasLength(2));
     expect(store.groupFeedPlans, hasLength(1));
     expect(store.groupDailyFeedTotals, isEmpty);
-    final legacy = store.exportData();
+    final legacy = legacySchema4(store.exportData());
     legacy['schemaVersion'] = 2;
     legacy.remove('groups');
     legacy.remove('legacyMemberships');
@@ -256,7 +261,8 @@ void main() {
     final old = FarmBackupCodec.decode(jsonEncode(legacy));
     expect(old.groups, isEmpty);
     final invalid = store.exportData();
-    final encoded = (invalid['groups'] as List).single as Map<String, dynamic>;
+    final encoded = (backupPayload(invalid)['groups'] as List).single
+        as Map<String, dynamic>;
     final record = (encoded['history'] as List).last as Map<String, dynamic>;
     record['headCount'] = -3;
     await expectLater(
@@ -273,7 +279,9 @@ void main() {
         ageMonths: 18,
         estimatedWeight: 350,
         history: [WeightRecord(weightKg: 350, date: now)]));
-    final data = store.exportData()..['schemaVersion'] = 3;
+    final data = legacySchema4(store.exportData())..['schemaVersion'] = 3;
+    data.remove('groupFeedPlans');
+    data.remove('legacyMemberships');
     data['groups'] = [
       {
         'id': 'old-group',
@@ -302,7 +310,8 @@ void main() {
     final roundTrip = FarmBackupCodec.decode(jsonEncode(store.exportData()));
     expect(roundTrip.groups.single.headCount, 1);
     expect(roundTrip.legacyMemberships, hasLength(1));
-    expect(roundTrip.cattle, isEmpty);
+    expect(roundTrip.cattle.single.id, c.id);
+    expect(roundTrip.cattle.single.status, CattleStatus.archived);
   });
 
   test('Bad API results and network rejection never create a fake group plan',

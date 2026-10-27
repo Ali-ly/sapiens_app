@@ -29,7 +29,7 @@ Jika data lokal tidak dapat dibaca, snapshot yang sudah ada dipertahankan dan mu
 
 ## Persistensi dan kompatibilitas
 
-`FarmBackupCodec` menulis schema JSON versi 4 untuk sapi, pakan individual, histori kelompok, rencana pakan kelompok, dan arsip relasi lama. Versi 2 dan 3 tetap dapat dibaca. Migrasi versi 3 membuat satu catatan awal kelompok dari data lama; data individual sesudahnya tidak mengubah kelompok. Pembacaan disk dan impor cadangan memakai decoder yang sama. Format lama tanpa `schemaVersion`, `feedPlans`, atau sumber catatan bobot tetap diterima. Versi schema yang tidak dikenali ditolak.
+`FarmBackupCodec` menulis envelope schema JSON versi 5 untuk sapi, pakan individual, histori kelompok, rencana pakan kelompok, dan arsip relasi lama. Payload berada di `data`, shared foundation versi 2, domain namespace versi 1. [Aturan migrasi](schema-migration.md) menjelaskan validasi, identitas dan proteksi reader lama. Versi unversioned/2/3/4 tetap dapat dimigrasikan. Migrasi versi 3 membuat satu catatan awal kelompok dari data lama; data individual sesudahnya tidak mengubah kelompok. Pembacaan disk dan impor cadangan memakai decoder yang sama. Format lama tanpa `schemaVersion`, `feedPlans`, atau sumber catatan bobot tetap diterima. Versi schema yang tidak dikenali ditolak.
 
 Identifier penyimpanan, lokasi file, dan bundle/application ID lama sengaja tidak diubah saat package Dart menjadi `sapita_app`. Perubahan identifier tersebut membutuhkan rencana migrasi tersendiri. Nama lama pada identifier bukan teks brand yang ditampilkan pengguna.
 
@@ -41,7 +41,7 @@ Alamat gateway berasal dari `ApiConstants.baseUrl` dan dapat diganti dengan `--d
 
 ### Estimasi bobot
 
-`POST /predict-weight`, multipart dengan satu sampai empat bagian `files`. `WeightService` mengembalikan `WeightEstimate`, bukan map JSON mentah. Field respons:
+`POST /v2/weight`, multipart dengan satu sampai empat bagian `files`. `WeightService` mengembalikan `WeightEstimate`, bukan map JSON mentah. Field respons:
 
 - `estimated_weight_kg`: bobot numerik yang valid.
 - `prediction_spread_kg`: variasi prediksi opsional.
@@ -51,7 +51,7 @@ Variasi prediksi tidak diperlakukan sebagai interval kepercayaan klinis atau jam
 
 ### Perhitungan pakan
 
-`POST /calculate-feed`, JSON:
+`POST /calculate-feed`, JSON (kompatibilitas Group Feed saja):
 
 ```json
 {
@@ -65,7 +65,7 @@ Target yang didukung: `pemeliharaan`, `pertumbuhan`, `penggemukan`. Minimal satu
 
 Respons memiliki `recommendation` per bahan dengan `as_fed_kg`, opsional `dry_matter_kg` dan `ratio_dm`; dapat menyertakan `total_dry_matter_kg`, `weight_kg`, `target`, `warning`, dan `notes`. Fixture kontrak ada di `test/helpers/feed_fixture.dart`.
 
-`FeedResponseMapper` memisahkan kontrak gateway dari model penyimpanan. Kg pakan segar dan kg bahan kering dipertahankan sebagai besaran berbeda. Bahan tidak dipilih, nilai negatif/non-finite, total nol, atau hasil yang tidak cocok dengan permintaan ditolak.
+Individual memakai `FeedService.fetchFeeds` (`GET /v2/feeds/{production_category}`) dan `calculateNutrition` (`POST /v2/nutrition`), dengan DTO request/response v2 serta `CattleNutritionContext`. `FarmStore` membuat snapshot evaluasi bertipe `nutritionEvaluation`; ini tidak otomatis menjadi ransum aktif/stok. `calculatePlan` dan `FeedResponseMapper` individual sudah dihapus. `FeedRation` tetap memvalidasi respons legacy Group Feed. Kg pakan segar dan bahan kering pada arsip legacy tetap merupakan besaran terpisah. [Detail cleanup](legacy-individual-cleanup.md).
 
 `ApiResponse` menangani JSON dan error gateway/FastAPI yang dapat bertingkat. Timeout dan kegagalan jaringan diubah menjadi `ApiException`. Client HTTP yang disuntikkan tetap dimiliki pemanggil; client bawaan ditutup oleh service.
 
@@ -90,7 +90,7 @@ CI mengikuti [panduan Flutter continuous delivery](https://docs.flutter.dev/depl
 
 `FarmTab` mendefinisikan empat tujuan shell. `MainScreen` menyimpan tujuan aktif dan permintaan filter. `CattleListScreen.didUpdateWidget` menerapkan permintaan filter baru tanpa membuat salinan halaman daftar. `IndexedStack` mempertahankan state tab. `PopScope` mengembalikan pengguna ke Ringkasan dari tab utama lain; route detail tetap ditangani Navigator yang sudah ada.
 
-Penangkapan foto diganti oleh peninjauan hasil. Sesudah bobot disimpan dan pengguna lanjut ke pakan, route peninjauan diganti kalkulator. Dua langkah kalkulator/hasil tetap berpasangan agar input dapat diperbaiki. Validator, kontrak API, tetap berlaku. Cadangan memakai schema 4 dengan dukungan pembacaan schema 2 dan 3.
+Penangkapan foto diganti oleh peninjauan hasil. Sesudah bobot disimpan dan pengguna lanjut ke pakan, route peninjauan diganti kalkulator. Dua langkah kalkulator/hasil tetap berpasangan agar input dapat diperbaiki. Validator, kontrak API, tetap berlaku. Cadangan memakai schema 5 dengan migrasi unversioned/2/3/4.
 
 Brand tampilan dan class entry point menjadi SAPIENS/`SapiensApp`; package Dart tetap `sapita_app`. Binary desktop menjadi `sapiens`, sedangkan application ID serta lokasi data lama dipertahankan. Rename bundle ID atau package internal adalah migrasi terpisah.
 
@@ -104,7 +104,7 @@ Model `SelectedImage` tetap menyimpan byte read-only. Widget `PhotoPreview` memb
 
 `LivestockGroup` memiliki ID stabil, tanggal dibuat, dan histori immutable `GroupRecord`. Data kini berasal dari catatan terakhir, bukan agregasi sapi. Catatan menyimpan nama, jumlah, bobot rata-rata opsional, target, catatan pengguna, status arsip, waktu, dan sumber perubahan. `FarmStore` menambahkan catatan melalui antrean transaksi yang sama dengan fitur individual. Edit individual tidak mengubah kelompok atau historinya.
 
-`GroupFeedService` mengirim bobot rata-rata ke transport `FeedService` yang sudah ada. `FeedRation` memetakan serta memvalidasi respons bersama alur individual. `GroupFeedPlan` menyimpan takaran per ekor beserta jumlah, bobot rata-rata, target, dan revisi input. Total kelompok diturunkan dari snapshot rencana tersebut. `inputRevision` berubah hanya saat input perhitungan berubah; perubahan bolak-balik tetap menghasilkan revisi baru, sehingga rencana lama tidak hidup kembali. Hasil tertinggal ditolak saat disimpan. Nama/catatan tidak membatalkan pakan.
+`GroupFeedService` mengirim bobot rata-rata ke transport `FeedService` yang sudah ada. `FeedRation` memetakan serta memvalidasi respons legacy Group Feed; individual tidak memakainya. `GroupFeedPlan` menyimpan takaran per ekor beserta jumlah, bobot rata-rata, target, dan revisi input. Total kelompok diturunkan dari snapshot rencana tersebut. `inputRevision` berubah hanya saat input perhitungan berubah; perubahan bolak-balik tetap menghasilkan revisi baru, sehingga rencana lama tidak hidup kembali. Hasil tertinggal ditolak saat disimpan. Nama/catatan tidak membatalkan pakan.
 
 `GroupRules` memvalidasi histori, batas angka, identitas, dan relasi rencana terhadap input historisnya. UI berada di `screens/groups/` dan memakai komponen yang sudah ada. `MainScreen` langsung memakai `CattleListScreen` pada tab Ternak. Tidak ada pemilih mode atau wrapper kelompok pada jalur utama. `GroupListScreen` dibuka sebagai route tambahan dari tautan opsional; kembali menampilkan halaman asal dengan pencarian/filter tetap tersimpan. Home dan Pakan mengutamakan profil individual. Rekap bahan membuka cakupan individual secara default; pintasan dari kelompok memakai `initialGroupScope: true`. Kedua cakupan tetap tidak dijumlahkan otomatis.
 
@@ -115,3 +115,21 @@ Model `SelectedImage` tetap menyimpan byte read-only. Widget `PhotoPreview` memb
 `CommandCenterScreen` menyusun bagian halaman dan menangani navigasi. `FarmMetricCard` serta `FarmFeedSummary` menerima nilai/proyeksi dan callback; keduanya tidak mengakses store. `CattleFeedPanel` menerima sapi, rencana, dan status terkini untuk menampilkan aksi pakan; penyimpanan tetap berada di alur kalkulator/store. `GroupRecordTile` hanya memformat satu catatan historis kelompok, termasuk label sumber dan waktu lokal.
 
 Komponen tersebut berada dalam `screens/<fitur>/widgets/`, agar widget khusus fitur tidak memenuhi direktori widget bersama. Folder `lib/widgets/` berisi komponen lintas fitur seperti panel, halaman, dan preview foto. Perubahan ini tidak menambah state kedua atau mengubah serialisasi data.
+
+## Phase 1 — fondasi model data bersama
+
+`Cattle` kini menjadi facade untuk komposisi `SharedTwinCore` dan batas modul Beef/Dairy. Sistem produksi bertipe, status keluar/arsip, histori bersama, pemeriksaan ID, serta aturan retry rencana dijelaskan pada [Data Model Foundation](data-model-foundation.md). Phase 1 memakai schema 4 dengan blok tambahan versi 1; Phase 2 menaikkan envelope ke schema 5.
+
+Phase 2 menambah `FarmPayloadCodec`/`FarmPayloadShape` untuk validasi isi lintas versi, `SnapshotUpgrade` untuk backfill murni, dan `FarmIdentity` untuk identitas lokal/legacy yang dibedakan asalnya. Store melakukan write upgrade sebelum publish. `PersistedTime` mempertahankan literal timestamp dan `AgeEvidence` menjaga kepastian umur tanpa DOB buatan. Adapter/lokasi data tetap sama.
+
+Shared Core UI memakai operasi store yang sama untuk kategori, status, tahap hidup, dan kesehatan. Form memeriksa identitas farm, revisi pengaturan, atau jumlah event sesuai operasi sebelum menyimpan agar form tertinggal tidak menimpa perubahan yang relevan. Guard tersebut bersifat lokal dan tidak menambah field persistensi atau menggantikan kontrol konkurensi lintas perangkat. Detail tampilan, histori, dan batas umur ada di [Shared Core UI](shared-core-ui.md).
+
+
+## Phase 4 — Beef
+
+`BeefExtension` memiliki histori immutable bertipe, sementara `BeefGrowth`, `BeefFeedContext`, dan `BeefFeedDemand` menyediakan aturan deterministik. `BeefRules` memvalidasi ledger dan referensi reproduksi sebelum persistensi; tidak menambah state management atau sumber kebenaran kedua. `FarmSnapshot.feedStock` adalah ledger bersama dalam kg pakan segar. Semua mutasi melalui FarmStore dan write-before-publish. Detail gate versi, batas backend dan cakupan stok ada di [Beef Module](beef-module.md).
+
+
+## Phase 5 — Dairy
+
+`DairyExtension` versi 2 memuat event domain dan snapshot susu immutable. `DairyRules` menjaga shape, tanggal, koreksi harian, paritas dan referensi lintas histori; `DairyMetrics` adalah proyeksi kalender tanpa event sintetis atau state kedua. Calving adalah sumber siklus, susu adalah fakta per tanggal, dan window masa tahan berasal dari pengguna. Reader Phase 4 menolak namespace baru; root schema 5/foundation 3, Shared Twin 2 serta Beef 2 dipertahankan. Detail denominator, boundaries dan batas backend ada di [Dairy Module](dairy-module.md).

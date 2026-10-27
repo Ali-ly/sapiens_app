@@ -1,10 +1,12 @@
 import 'group_record.dart';
+import 'persisted_time.dart';
 
 /// A bulk herd independent of individual cattle. Current data is the latest record.
 class LivestockGroup {
   LivestockGroup(
       {required this.id,
       required this.createdAt,
+      this.createdAtText,
       required List<GroupRecord> history})
       : history = List.unmodifiable(history) {
     if (history.isEmpty) {
@@ -12,6 +14,7 @@ class LivestockGroup {
     }
   }
   final String id;
+  final String? createdAtText;
   final DateTime createdAt;
   final List<GroupRecord> history;
   GroupRecord get current => history.last;
@@ -39,15 +42,19 @@ class LivestockGroup {
   }
 
   LivestockGroup append(GroupRecord record) => LivestockGroup(
-      id: id, createdAt: createdAt, history: [...history, record]);
+      id: id,
+      createdAt: createdAt,
+      createdAtText: createdAtText,
+      history: [...history, record]);
   Map<String, dynamic> toJson() => {
         'id': id,
-        'createdAt': createdAt.toIso8601String(),
+        'createdAt': PersistedTime.encode(createdAt, createdAtText),
         'history': history.map((r) => r.toJson()).toList()
       };
   factory LivestockGroup.fromJson(Map<String, dynamic> json) => LivestockGroup(
       id: json['id'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+      createdAtText: json['createdAt'] as String,
+      createdAt: PersistedTime.parse(json['createdAt'] as String),
       history: (json['history'] as List)
           .map((value) =>
               GroupRecord.fromJson(Map<String, dynamic>.from(value as Map)))

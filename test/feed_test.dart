@@ -9,12 +9,14 @@ import 'package:sapita_app/data/farm_backup_codec.dart';
 import 'package:sapita_app/models/cattle.dart';
 import 'package:sapita_app/models/feed_plan.dart';
 import 'package:sapita_app/models/selected_image.dart';
-import 'package:sapita_app/services/feed_response_mapper.dart';
+import 'package:sapita_app/services/feed_ration.dart';
 import 'package:sapita_app/services/feed_service.dart';
 import 'package:sapita_app/services/weight_service.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
+import 'helpers/backup_fixture.dart';
 import 'helpers/feed_fixture.dart';
+import 'helpers/legacy_feed_plan_fixture.dart';
 
 void main() {
   late FarmStore store;
@@ -42,15 +44,10 @@ void main() {
           ],
         ),
       );
-  FeedPlan plan(Cattle c) => FeedResponseMapper.parse(
-        cattle: c,
-        target: 'penggemukan',
-        condition: 'Sedang',
-        feeds: ['rumput', 'jerami', 'dedak'],
-        data: readFeedResponse(),
-      );
+  FeedPlan plan(Cattle c) =>
+      legacyFeedPlan(cattle: c, createdAt: store.currentTime);
   test(
-    'Live-response fixture parses fresh vs dry matter without mixing units',
+    'Historical ration fixture retains fresh vs dry matter units',
     () async {
       final p = plan(await cattle());
       expect(p.totalFreshKg, closeTo(27.3, .001));
@@ -60,7 +57,7 @@ void main() {
     },
   );
   test(
-    'Feed service sends exactly the fields supported by the live API',
+    'Group-required legacy transport retains its exact backend contract',
     () async {
       final client = MockClient(
         (request) async {
@@ -132,7 +129,7 @@ void main() {
     },
   );
   test(
-    'Invalid, zero, unselected or mismatched feed results are rejected',
+    'Group-required ration parser rejects invalid, zero, unselected or mismatched results',
     () async {
       final c = await cattle();
       for (final data in [
@@ -158,10 +155,9 @@ void main() {
         {...readFeedResponse(), 'weight_kg': 999}
       ]) {
         expect(
-          () => FeedResponseMapper.parse(
-            cattle: c,
+          () => FeedRation.parse(
+            weight: c.estimatedWeight!,
             target: 'penggemukan',
-            condition: 'Tidak tahu',
             feeds: ['rumput', 'jerami', 'dedak'],
             data: data,
           ),
@@ -198,7 +194,10 @@ void main() {
       expect(store.planReady(updated), isFalse);
       expect(store.dailyFeedTotals, isEmpty);
       expect(store.feedPlans.length, 1);
-      await expectLater(store.savePlan(p), throwsStateError);
+      await store.savePlan(p); // Retry of an existing record is idempotent.
+      final staleNew =
+          FeedPlan.fromJson({...p.toJson(), 'id': 'new-stale-plan'});
+      await expectLater(store.savePlan(staleNew), throwsStateError);
     },
   );
   test(
@@ -223,19 +222,21 @@ void main() {
     },
   );
   test(
-    'Cattle deletion removes associated plans',
+    'Cattle archive preserves plans and excludes operational totals',
     () async {
       final c = await cattle();
       await store.savePlan(plan(c));
       await store.remove(c.id);
-      expect(store.feedPlans, isEmpty);
+      expect(store.feedPlans.single.cattleId, c.id);
+      expect(store.byId(c.id)!.isActive, isFalse);
+      expect(store.dailyFeedTotals, isEmpty);
     },
   );
   test(
     'Legacy storage without feedPlans is migrated without losing cattle',
     () async {
       final c = await cattle();
-      final data = store.exportData()..remove('feedPlans');
+      final data = legacySchema4(store.exportData())..remove('feedPlans');
       final legacy =
           FarmStore(read: () async => jsonEncode(data), write: (_) async {});
       await legacy.load();
@@ -257,7 +258,8 @@ void main() {
       expect(restored.feedPlans.length, 1);
       expect(restored.dailyFeedTotals['dedak'], 3.9);
       final invalid = store.exportData();
-      (invalid['cattle'] as List).add((invalid['cattle'] as List).first);
+      (backupPayload(invalid)['cattle'] as List)
+          .add((backupPayload(invalid)['cattle'] as List).first);
       expect(
         () => FarmBackupCodec.decode(jsonEncode(invalid)),
         throwsFormatException,
@@ -285,12 +287,14 @@ void main() {
     'Weight API parses multipart and rejects invalid numerical weights',
     () async {
       final image = SelectedImage(
+        name: 'cow.jpg',
         file: XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'cow.jpg'),
         bytes: Uint8List.fromList([1, 2, 3]),
       );
       final client = MockClient(
         (request) async {
-          expect(request.url.path, '/predict-weight');
+          expect(request.url.path, '/v2/weight');
+          expect(request.body, contains('filename="cow.jpg"'));
           expect(
             request.headers['content-type'],
             contains('multipart/form-data'),

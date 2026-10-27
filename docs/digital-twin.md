@@ -27,7 +27,7 @@ Kelompok dengan jumlah nol boleh disimpan, tetapi perhitungan pakan dinonaktifka
 
 Jumlah, bobot rata-rata, atau target yang berubah membatalkan kecocokan rencana terkini, termasuk jika nilainya kemudian dikembalikan seperti semula. Edit nama/catatan tidak membatalkannya. Rencana yang tertinggal akibat edit saat request berjalan ditolak ketika disimpan.
 
-Semua mutasi memakai antrean `FarmStore`. State baru diterbitkan sesudah disk berhasil ditulis. `GroupRules` digunakan untuk mutasi, load, dan impor: memeriksa ID/nama, batas jumlah dan bobot, urutan histori, sumber, relasi input rencana, serta angka hasil API. Edit/hapus sapi individual tidak mengubah data kelompok.
+Semua mutasi memakai antrean `FarmStore`. State baru diterbitkan sesudah disk berhasil ditulis. `GroupRules` digunakan untuk mutasi, load, dan impor: memeriksa ID/nama, batas jumlah dan bobot, urutan histori, sumber, relasi input rencana, serta angka hasil API. Edit/arsip sapi individual tidak mengubah data kelompok.
 
 ## Disederhanakan dari implementasi sebelumnya
 
@@ -52,3 +52,7 @@ ID stabil, histori bertanggal, sumber, dan snapshot input rencana dapat menjadi 
 ## Profil individual
 
 Bobot manual, estimasi foto, histori, rencana pakan, dan pencarian/filter individual tetap tersedia langsung di **Ternak**. Tombol **Hitung kebutuhan pakan** nonaktif saat bobot belum pernah dicatat; aktif kembali sesudah bobot tersimpan. Profil tidak wajib tergabung ke kelompok.
+
+## Pembaruan schema Phase 2
+
+Format write aktif sekarang schema 5. Aturan historis schema 3/4 di atas tetap menjadi sumber kompatibilitas, tetapi migrasi kelompok 3 kini memakai anchor waktu deterministik berlabel, bukan waktu load. Lihat [schema migration](schema-migration.md) untuk ID farm/record/media, envelope, usia dan ketidakpastian timestamp.

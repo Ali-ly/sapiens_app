@@ -26,7 +26,9 @@ class GroupRecordTile extends StatelessWidget {
         : '${kgLabel(record.averageWeightKg!)} kg rata-rata';
     final details = [
       '${record.name} · ${targetLabels[record.target]}',
-      '${dateLabel(recordedAt)} $time · $_sourceLabel',
+      record.timeBasis == GroupRecordTimeBasis.recorded
+          ? '${dateLabel(recordedAt)} $time · $_sourceLabel'
+          : '${dateLabel(recordedAt)} · $_sourceLabel (waktu acuan)',
       if (record.notes.isNotEmpty) record.notes,
     ];
     return Panel(

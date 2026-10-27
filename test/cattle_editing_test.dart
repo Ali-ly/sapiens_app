@@ -6,10 +6,9 @@ import 'package:sapita_app/app.dart';
 import 'package:sapita_app/models/cattle.dart';
 import 'package:sapita_app/models/feed_plan.dart';
 import 'package:sapita_app/screens/cattle/add_cattle_screen.dart';
-import 'package:sapita_app/services/feed_response_mapper.dart';
 import 'package:sapita_app/state/farm_store.dart';
 
-import 'helpers/feed_fixture.dart';
+import 'helpers/legacy_feed_plan_fixture.dart';
 import 'helpers/test_app.dart';
 
 void main() {
@@ -43,13 +42,8 @@ void main() {
           ],
         ),
       );
-  FeedPlan planFor(Cattle c) => FeedResponseMapper.parse(
-        cattle: c,
-        target: 'penggemukan',
-        condition: 'Sedang',
-        feeds: ['rumput', 'jerami', 'dedak'],
-        data: readFeedResponse(),
-      );
+  FeedPlan planFor(Cattle c) =>
+      legacyFeedPlan(cattle: c, createdAt: store.currentTime);
   test(
     'Identity edit preserves the latest weight and history',
     () async {
@@ -120,20 +114,14 @@ void main() {
       final real = await realCattle();
       await store.savePlan(planFor(real));
       final demo = store.cattle.first;
-      final demoData = readFeedResponse();
-      demoData['weight_kg'] = demo.estimatedWeight;
       await store.savePlan(
-        FeedResponseMapper.parse(
-          cattle: demo,
-          target: 'penggemukan',
-          condition: 'Sedang',
-          feeds: ['rumput', 'jerami', 'dedak'],
-          data: demoData,
-        ),
+        legacyFeedPlan(cattle: demo, createdAt: store.currentTime),
       );
       await store.removeExamples();
       expect(store.cattle.single.id, real.id);
-      expect(store.feedPlans.single.cattleId, real.id);
+      expect(store.feedPlans, hasLength(2));
+      expect(store.feedPlans.any((p) => p.cattleId == real.id), isTrue);
+      expect(store.byId(demo.id)!.status, CattleStatus.archived);
       expect(store.demo, isFalse);
     },
   );
@@ -178,7 +166,7 @@ void main() {
         tester.widget<MaterialApp>(find.byType(MaterialApp)).title,
         'SAPIENS',
       );
-      expect(find.text('Selamat datang di SAPIENS.'), findsOneWidget);
+      expect(find.text('Kamu beternak sapi apa?'), findsOneWidget);
     },
   );
   testWidgets(
