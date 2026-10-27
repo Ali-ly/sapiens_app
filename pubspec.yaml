@@ -1,26 +1,24 @@
-name: sapita_app
-description: "SAPIENS: pantau bobot sapi dan rencanakan kebutuhan pakan."
-publish_to: 'none'
-
-version: 1.0.0+1
-
+name: sapiens_app
+description: 'SAPIENS — Pendamping peternakan sapi berbasis data individual.'
+publish_to: none
+version: 0.1.0+1
 environment:
   sdk: ^3.5.4
-
 dependencies:
   flutter:
     sdk: flutter
-
   cupertino_icons: ^1.0.8
-  image_picker: ^1.1.2
-  http: ^1.6.0
+  flutter_riverpod: 2.6.1
+  http: 1.6.0
+  image_picker: 1.1.2
+  uuid: 4.5.1
+  share_plus: 10.1.4
+  file_picker: 8.1.7
+  path_provider: 2.1.5
   crypto: 3.0.6
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^4.0.0
-
 flutter:
   uses-material-design: true

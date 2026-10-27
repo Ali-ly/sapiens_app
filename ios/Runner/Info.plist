@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Gunakan kamera untuk foto sapi saat mengecek berat.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pilih foto sapi untuk galeri dan estimasi berat.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -13,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>SAPIENS</string>
+	<string>sapiens_app</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,9 +49,5 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Kamera digunakan untuk mengambil foto sapi dan memperkirakan bobotnya.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Pilih foto sapi dari galeri untuk menghitung perkiraan bobot dan kebutuhan pakannya.</string>
 </dict>
 </plist>
