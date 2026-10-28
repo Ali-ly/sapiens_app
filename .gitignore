@@ -41,3 +41,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local test reports and generated design/export artifacts
+/coverage/
+/test-results/
+/outputs/
+/screenshots/
+/exports/
+/backups/
+/*.zip
+
+# Local environment files; keep shareable configuration templates
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template

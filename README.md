@@ -2,6 +2,18 @@
 
 MVP Flutter baru untuk peternak sapi Potong atau Perah. Mode ditetapkan di akun lokal; satu sapi menjadi konteks pencatatan dan evaluasi. Navigasi: Beranda, Ternak, Pakan, Profil.
 
+## Versi terbaru dan isi repository
+
+Branch `main` adalah versi aplikasi terkini yang digunakan untuk clone atau Download ZIP. Versi sebelum rebuild tetap dapat dilihat melalui riwayat commit; file aplikasi lama tidak digabungkan dengan source sekarang.
+
+- `lib/`: source aplikasi, UI, model, API, dan penyimpanan.
+- `android/`, `ios/`, `web/`: konfigurasi platform dan aset yang diperlukan.
+- `test/`, `tool/`: regression tests, fixture sintetis, serta alat verifikasi/export layar yang dijalankan secara eksplisit.
+- `docs/`, `DESIGN.md`: arsitektur, kontrak backend, panduan desain, dan catatan verifikasi bertanggal.
+- `pubspec.yaml`, `pubspec.lock`: dependensi aplikasi yang harus dipertahankan.
+
+Build, cache, laporan test, screenshot/export lokal, cadangan akun, dan file environment lokal tidak disertakan. Screenshot untuk Stitch dibuat terpisah mengikuti [panduan export layar](docs/screen-export.md). Sebelum upload berikutnya, periksa `git status` dan `git diff --cached --stat` agar hanya perubahan yang memang diperlukan ikut commit.
+
 ## Menjalankan
 
 Diuji dengan Flutter 3.24.5 / Dart 3.5.4.
