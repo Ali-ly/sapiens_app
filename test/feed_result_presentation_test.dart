@@ -164,17 +164,21 @@ void main() {
         home: EvaluationResultPage(
             evaluation: resultFixture(), cattleName: 'Sapi uji')));
     await t.pumpAndSettle();
-    final label = find.text('Kelengkapan data dan keyakinan layanan');
+    final label = find.text('Lihat rincian perhitungan');
     await t.scrollUntilVisible(label, 200, maxScrolls: 60);
     await t.ensureVisible(label);
     await t.pumpAndSettle();
     await t.tap(label);
     await t.pumpAndSettle();
-    expect(find.textContaining('100% cakupan data'), findsWidgets);
-    expect(find.text('Cakupan data bukan persentase kecukupan pakan.'),
-        findsOneWidget);
+    await t.scrollUntilVisible(find.text('Kelengkapan data'), 200,
+        maxScrolls: 100);
+    await t.pumpAndSettle();
+    expect(find.text('100%'), findsWidgets);
     expect(
-        find.text('Keyakinan perhitungan kebutuhan: Sedang'), findsOneWidget);
+        find.text(
+            'Kelengkapan data berbeda dari persentase kebutuhan nutrisi yang terpenuhi.'),
+        findsOneWidget);
+    expect(find.text('Sedang'), findsWidgets);
   });
   for (final dairy in [false, true]) {
     for (final width in [320.0, 390.0, 1280.0]) {
@@ -205,17 +209,20 @@ void main() {
           }
           for (final label in [
             'Pakan yang dimasukkan',
-            'Catatan yang memengaruhi hasil',
-            'Rincian perhitungan'
+            'Lihat rincian perhitungan'
           ]) {
             await t.scrollUntilVisible(find.text(label), 200, maxScrolls: 60);
             await t.pumpAndSettle();
           }
-          await t.scrollUntilVisible(find.text('Data teknis backend'), 200,
-              maxScrolls: 60);
-          await t.ensureVisible(find.text('Data teknis backend'));
+          await t.ensureVisible(find.text('Lihat rincian perhitungan'));
+          await t.tap(find.text('Lihat rincian perhitungan'));
           await t.pumpAndSettle();
-          await t.tap(find.text('Data teknis backend'));
+          await t.scrollUntilVisible(
+              find.text('Lihat data teknis backend'), 200,
+              maxScrolls: 100);
+          await t.ensureVisible(find.text('Lihat data teknis backend'));
+          await t.pumpAndSettle();
+          await t.tap(find.text('Lihat data teknis backend'));
           await t.pumpAndSettle();
           expect(find.byType(SelectableText), findsOneWidget);
           expect(t.takeException(), isNull);
